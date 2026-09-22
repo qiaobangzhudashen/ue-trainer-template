@@ -110,4 +110,6 @@ def tool_deps(args):
     lines.append('  toolbox.run("db",   action="search", keyword="词", db="data.db", table="表名")')
     lines.append('  toolbox.run("ce",   action="scan", value="15000", type="dword")  # 需CE在线')
     lines.append('  toolbox.run("ce",   action="aob", pattern="48 8B ?? ?? 57")')
+    lines.append('  toolbox.run("ce",   action="lbr", op="start")  # 回溯分支;read取数')
+    lines.append('  toolbox.run("ce",   action="step", thread=111, count=80)  # 单步找解密')
     return "\n".join(lines)

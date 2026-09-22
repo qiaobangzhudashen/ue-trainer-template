@@ -22,7 +22,7 @@ def game_paths(root, mod_rel):
 
 def send_lines(cmd_path, lines):
     tmp = cmd_path + '.tmp'
-    with open(tmp, 'w', encoding='ascii') as f:
+    with open(tmp, 'w', encoding='utf-8') as f:  # utf-8: ASCII 子集与旧行为一致,中文命令不崩
         f.write('\n'.join(lines) + '\n')
     os.replace(tmp, cmd_path)
 

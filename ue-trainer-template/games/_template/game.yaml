@@ -4,6 +4,7 @@
 
 game: _TEMPLATE
 exe: Game-Win64-Shipping.exe
+# version: 1.0.0  # 游戏版本,AOB 失效时先对版本(按 AOB 三律重走搜断反补丁)
 # Mod 在游戏目录下的相对路径 (UE4SS Mod 目录)
 mod_rel: Game/Binaries/Win64/ue4ss/Mods/GameTrainer
 # 官方发奖函数 (Lua 侧用,物品添加走这条,不走内存)

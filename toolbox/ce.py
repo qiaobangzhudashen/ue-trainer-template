@@ -440,6 +440,8 @@ def tool_ce(args):
                 ok, tids = _thread_ids()
                 if not ok:
                     return _fmt(False, tids)
+                if not tids:
+                    return "Error: 线程列表为空(游戏是否在跑?CE 是否已 attach?)"
             else:
                 try:
                     tids = [int(tsel, 0)]
@@ -475,7 +477,7 @@ def tool_ce(args):
                 out.append(f"--- thread {tid} (最近 {min(len(recs), pairs_cap)} 对) ---")
                 for r in recs[-pairs_cap:]:
                     if total >= 96:
-                        out.append("...(对数超限,加 pairs 调小范围)")
+                        out.append("...(对数超限,调小 pairs 或指定单个 thread)")
                         break
                     total += 1
                     try:

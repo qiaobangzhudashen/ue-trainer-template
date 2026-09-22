@@ -17,14 +17,14 @@ import argparse
 import sys
 
 try:
-    from keystone import Ks, KS_ARCH_X86, KS_MODE_64
+    from keystone import Ks, KS_ARCH_X86, KS_MODE_64, KS_MODE_32
 except ImportError:
     print('缺 keystone-engine,跑: pip install keystone-engine')
     sys.exit(1)
 
 
-def asm_to_hex(src, base=0):
-    ks = Ks(KS_ARCH_X86, KS_MODE_64)
+def asm_to_hex(src, base=0, bits=64):
+    ks = Ks(KS_ARCH_X86, KS_MODE_64 if bits == 64 else KS_MODE_32)
     # keystone 用 ; 分隔, label 用 : 结尾
     encoding, _ = ks.asm(src, base)
     return bytes(encoding).hex().upper()
@@ -34,12 +34,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--asm', default='')
     ap.add_argument('--file', default='')
+    ap.add_argument('--bits', type=int, default=64, choices=(32, 64))
     a = ap.parse_args()
+    if not a.asm and not a.file:
+        ap.error('给 --asm 或 --file (32 位游戏加 --bits 32)')
     src = a.asm.replace('|', '\n')
     if a.file:
         with open(a.file, encoding='utf-8') as f:
             src = f.read()
-    hexs = asm_to_hex(src)
+    hexs = asm_to_hex(src, bits=a.bits)
     print(hexs)
     print('len=%d' % (len(hexs) // 2))
     try:

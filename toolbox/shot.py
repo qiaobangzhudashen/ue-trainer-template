@@ -386,7 +386,7 @@ def _is_blank(img):
 
 
 def _capture_window(hwnd, save_path):
-    """截取窗口客户区保存 PNG。pywin32 优先,异常/缺失自动降级 ctypes。返回保存路径。"""
+    """截取整个窗口(含标题栏/边框)保存 PNG。pywin32 优先,异常/缺失自动降级 ctypes。返回保存路径。"""
     if _has_pywin32():
         try:
             return _pw_capture_window(hwnd, save_path)
