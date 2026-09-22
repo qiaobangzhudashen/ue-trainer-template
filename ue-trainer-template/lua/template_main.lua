@@ -31,6 +31,29 @@ local function FreeOff()
     LVT("free off")
 end
 
+-- ============ 2b. 常用模式 cookbook (全注释,按需取消注释改) ============
+--[[ 正确放行(先确认目标函数返回值语义):
+   PreId, PostId = RegisterHook("/Script/Game.Module:CheckFunc",
+     function(self) return <放行值> end)  -- return nil/无return=保留原值
+   free_hooks[#free_hooks+1] = {"/Script/Game.Module:CheckFunc", PreId, PostId}
+   -- 注销: for _, h in ipairs(free_hooks) do UnregisterHook(h[1], h[2], h[3]) end
+--]]
+--[[ 读改入参(首参是this,余参按签名逐个包):
+   RegisterHook("/Script/Game.Module:CostFunc", function(self, Amount)
+     local cur = Amount:get()      -- 读
+     Amount:set(cur)               -- 写(只改标量,不碰struct整体)
+   end)
+--]]
+--[[ 游戏线程里调官方发奖(外部桥回调直接调会崩):
+   ExecuteInGameThread(function() GiveItem(5007, 99) end)
+--]]
+--[[ 场景限定对象(FindFirstOf拿不到时监听构造):
+   NotifyOnNewObject("/Script/Game.Module:ShopComp", function(obj) ... end)
+--]]
+--[[ 游戏内热键(控制台聚焦才触发,先查占用):
+   RegisterKeyBind(0x75, function() FreeOn() end)  -- F6,键值查表
+--]]
+
 -- ============ 3. 命令框架 (不动) ============
 local CMDS = {}
 local function reg(name, fn) CMDS[name] = fn end

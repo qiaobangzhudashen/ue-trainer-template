@@ -40,6 +40,11 @@ patches:
   #   overwrite_len: 6
   #   off_bytes: "66410F6E4104F3"   # 原地6字节备份 (恢复用,长度=overwrite_len)
   #   cave_hex: "909090909090"      # 洞内逻辑 (示例nop,真逻辑贴实测机器码)
+  #   data_size: 8                 # 洞内要读写外部数(倍数/指针)才加;洞里用
+  #                                # 0xAAAAAAAAAAAAAAAA(8字节token)占位,引擎回填
+  #                                # 真地址并清零.开了补丁后 UI 自动出"写数据"行:
+  #                                # data_type: qword # byte/word/dword/qword/float/double,默认qword
+  #                                # data_default: "10" # UI 输入框默认值(可选)
 
 # UI 开关与 Lua 命令的联动 (一勾同时驱动 Lua hook + 内存补丁)
 toggles:

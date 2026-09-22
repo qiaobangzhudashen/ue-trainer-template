@@ -84,10 +84,13 @@ def tool_ce(args):
       scan      首扫数值(value=<值> type=<dword|float|...>)
       next      收窄(scan_type=<exact|increased|decreased|changed|unchanged> [value=...])
       results   取扫描结果(limit=N,默认50)
-      aob       特征码扫描(pattern="AA BB ?? .." [limit=N])
+      aob       特征码扫描(pattern="AA BB ?? .." [module=主模块名] [limit=N])
       dis       反汇编(address=<地址> [count=N])
       read      读内存(address=<地址> size=<字节数>)
       write     写内存(address=<地址> bytes=<十进制逗号分隔,如144,144>)
+      rint      按类型读数(address=<地址> [type=dword|float|...])
+      wint      按类型写数(address=<地址> value=<值> [type=...],高危先确认地址)
+      rstr      读内存字符串(address=<地址> [size=256] [wide=0/1])
       watch     硬件断点(address=<地址> [access=r|w|rw] [id=...],最多4个;≈F5/F6)
       hits      取断点命中([id=...])
       unwatch   删断点(id=...)
@@ -114,7 +117,7 @@ def tool_ce(args):
              "write", "watch", "hits", "unwatch", "eval",
              "signature", "aa", "aacheck", "asm", "refs", "rtti",
              "dissect", "ptrchain", "psearch", "analyze", "instr",
-             "pause", "unpause"}
+             "pause", "unpause", "rint", "wint", "rstr"}
     if action not in valid:
         return f"Error: 未知 action {action!r},应为 {sorted(valid)}\n\n正确用法:\n" + tool_ce.__doc__
 
@@ -146,7 +149,13 @@ def tool_ce(args):
             pat = get_str(args, "pattern", "")
             if not pat:
                 return "Error: aob 需要 pattern。用法:\n  run('ce', action='aob', pattern='48 8B ?? ?? 57', limit=10)"
-            ok, res = _call("aob_scan", {"pattern": pat, "limit": get_int(args, "limit", 10)})
+            mod = get_str(args, "module", "")
+            if mod:
+                # 限定主模块(技能铁律:不用全局 aobscan,卡UI约10秒)
+                ok, res = _call("aob_scan_module",
+                                {"pattern": pat, "module": mod, "limit": get_int(args, "limit", 10)})
+            else:
+                ok, res = _call("aob_scan", {"pattern": pat, "limit": get_int(args, "limit", 10)})
             return _fmt(ok, res)
 
         if action == "dis":
@@ -308,6 +317,41 @@ def tool_ce(args):
         if action == "unpause":
             ok, res = _call("unpause_process", {})
             return _fmt(ok, res, 1000)
+
+        if action == "rint":
+            addr = get_str(args, "address", "")
+            if not addr:
+                return ("Error: rint 需要 address(按类型读数,比裸字节直观)。用法:\n"
+                        "  run('ce', action='rint', address='0x...', type='float')")
+            typ = get_str(args, "type", "dword")
+            if typ not in ("byte", "word", "dword", "qword", "float", "double"):
+                return f"Error: 未知 type {typ!r},应为 byte/word/dword/qword/float/double"
+            ok, res = _call("read_integer", {"address": addr, "type": typ})
+            return _fmt(ok, res, 1000)
+
+        if action == "wint":
+            addr = get_str(args, "address", "")
+            if not addr or get_str(args, "value", "") == "":
+                return ("Error: wint 需要 address+value(高危,先确认地址)。用法:\n"
+                        "  run('ce', action='wint', address='0x...', value='9999', type='dword')")
+            typ = get_str(args, "type", "dword")
+            if typ not in ("byte", "word", "dword", "qword", "float", "double"):
+                return f"Error: 未知 type {typ!r},应为 byte/word/dword/qword/float/double"
+            try:
+                val = float(args["value"]) if typ in ("float", "double") else int(str(args["value"]), 0)
+            except ValueError:
+                return "Error: value 格式错误(整数支持0x十六进制)"
+            ok, res = _call("write_integer", {"address": addr, "value": val, "type": typ})
+            return _fmt(ok, res, 1000)
+
+        if action == "rstr":
+            addr = get_str(args, "address", "")
+            if not addr:
+                return "Error: rstr 需要 address(读内存字符串,认物品名用)"
+            ok, res = _call("read_string", {"address": addr,
+                                            "max_length": get_int(args, "size", 256),
+                                            "wide": get_str(args, "wide", "") not in ("", "0", "false")})
+            return _fmt(ok, res, 2000)
 
     except ValueError as e:
         return f"Error: 参数格式错误 - {e}"

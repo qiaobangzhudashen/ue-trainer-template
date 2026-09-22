@@ -100,7 +100,7 @@ TOOLS_META = {
         "toolbox.ce",
         "tool_ce",
         "CE 桥接(搜值/AOB/反汇编/读写内存/硬件断点/AA注入/指针链,不点CE界面)",
-        "action=<ping|scan|next|results|aob|dis|read|write|watch|hits|unwatch|eval|signature|aa|aacheck|asm|refs|rtti|dissect|ptrchain|psearch|analyze|instr|pause|unpause> [value=...] [type=dword] [scan_type=exact] [pattern=...] [address=...] [base=...] [offsets=...] [script=...] [instruction=...] [string=...] [count=N] [size=N] [bytes=144,144] [access=w] [id=...] [code=...] [limit=N] [offset=N]",
+        "action=<ping|scan|next|results|aob|dis|read|write|rint|wint|rstr|watch|hits|unwatch|eval|signature|aa|aacheck|asm|refs|rtti|dissect|ptrchain|psearch|analyze|instr|pause|unpause> [value=...] [type=dword] [scan_type=exact] [pattern=...] [module=...] [address=...] [base=...] [offsets=...] [script=...] [instruction=...] [string=...] [count=N] [size=N] [bytes=144,144] [access=w] [id=...] [code=...] [limit=N] [offset=N]",
     ),
     "info": (
         "toolbox.info",

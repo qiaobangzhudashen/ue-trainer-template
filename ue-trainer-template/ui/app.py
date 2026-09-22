@@ -158,6 +158,16 @@ class App(tk.Tk):
                                  variable=v,
                                  command=lambda n=name, vv=v: self._mem(n, vv.get()))
             cb.pack(anchor='w', pady=2)
+            if int(spec.get('data_size', 0) or 0):
+                # cave 数据区补丁:先开补丁(分配洞),再在这里写倍数/开关值
+                row = ttk.Frame(fr)
+                row.pack(anchor='w', padx=(24, 0))
+                dv = tk.StringVar(value=str(spec.get('data_default', '')))
+                ttk.Entry(row, textvariable=dv, width=10).pack(side='left')
+                ttk.Button(row, text='写%s数据' % name,
+                           command=lambda n=name, vv=dv,
+                           dt=spec.get('data_type', 'qword'): self._wdata(n, vv.get(), dt)
+                           ).pack(side='left', padx=4)
         for key, tg in (self.cfg.get('toggles') or {}).items():
             v = tk.BooleanVar(value=False)
             ttk.Checkbutton(fr, text=tg.get('label', key), variable=v,
@@ -171,6 +181,20 @@ class App(tk.Tk):
         if not self.mem:
             return
         ok, msg = self.mem.apply(name) if on else self.mem.restore(name)
+        self.status.set(msg)
+
+    def _wdata(self, name, text, fmt):
+        if not self.mem:
+            return
+        try:
+            value = float(text) if fmt in ('float', 'double') else int(text, 0)
+        except ValueError:
+            messagebox.showerror('错误', '数据必须是数字(整数支持0x十六进制).')
+            return
+        ok, msg = self.mem.write_cave_data(name, value, fmt)
+        if not ok:
+            messagebox.showerror('写入失败', msg + '\n(先勾选打开该补丁再写)')
+            return
         self.status.set(msg)
 
     def _toggle(self, tg, on):

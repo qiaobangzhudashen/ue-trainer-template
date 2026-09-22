@@ -216,3 +216,27 @@ class GameMemory:
         if not cave:
             return None
         return cave + len(bytes.fromhex(spec['cave_hex'])) + 5
+
+    def write_cave_data(self, name, value, fmt='qword'):
+        """往 cave 数据区写一个数(倍数/开关值)。补丁须先开(洞已分配)。
+
+        fmt: byte/word/dword/qword/float/double。返回 (ok, msg)。"""
+        if not _PYMEM_OK:
+            return False, '未安装 pymem: %s' % _PYMEM_ERR
+        ok, msg = self._ensure()
+        if not ok:
+            return False, msg
+        addr = self.cave_data(name)
+        if not addr:
+            return False, '%s: 数据区不可用(非 cave/无 data_size/补丁未开)' % name
+        fn = {'byte': 'write_uchar', 'word': 'write_short', 'dword': 'write_int',
+              'qword': 'write_longlong', 'float': 'write_float',
+              'double': 'write_double'}.get(fmt)
+        if not fn:
+            return False, '未知格式 %r,应为 byte/word/dword/qword/float/double' % fmt
+        try:
+            getattr(self.pm, fn)(addr, value)
+        except Exception as ex:
+            return False, '%s: 写入失败 %s' % (name, ex)
+        back = self.pm.read_bytes(addr, 8).hex().upper()
+        return True, '%s 数据区%s=%s(%s) 回读%s' % (name, hex(addr), value, fmt, back)
