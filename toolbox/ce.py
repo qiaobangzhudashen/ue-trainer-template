@@ -13,6 +13,7 @@
 import json
 import os
 import struct
+import time
 
 PIPE = os.environ.get("CE_BRIDGE_PIPE", r"\\.\pipe\CE_MCP_Bridge_v99")
 
@@ -76,6 +77,60 @@ def _fmt(ok, res, limit=6000):
     return ("" if ok else "Error: ") + s
 
 
+def _tag(mnem, opstr=""):
+    """指令标注(启发式,供 agent 速览trace用,不是定论)。
+
+    [CRYPTO?] = 疑似加解密(xor/位移/乘且带立即数;xor同寄存器清零除外)。
+    [CALL]/[BRANCH]/[RET] = 调用/分支/返回,顺藤找门时盯 CALL 上游。"""
+    m = (mnem or "").lower()
+    ops = (opstr or "").lower()
+    if m in ("xor", "rol", "ror", "shl", "shr", "sal", "sar", "not", "neg",
+             "imul", "aesenc", "aesdec", "aesimc"):
+        if m == "xor":
+            parts = [p.strip() for p in ops.split(",")]
+            if len(parts) == 2 and parts[0] == parts[1]:
+                return ""  # xor eax,eax = 清零惯用,不是加密
+        if any(c.isdigit() for c in ops):
+            return " [CRYPTO?]"
+        return ""
+    if m == "call":
+        return " [CALL]"
+    if m in ("ret", "retn", "retf"):
+        return " [RET]"
+    if m.startswith("j"):
+        return " [BRANCH]"
+    return ""
+
+
+def _thread_ids(limit=100):
+    """线程 id_int 列表。返回 (ok, ids_or_err)。"""
+    ok, res = _call("get_thread_list", {"offset": 0, "limit": limit})
+    if not ok:
+        return False, res
+    try:
+        ids = [t.get("id_int") for t in (res.get("threads") or [])
+               if isinstance(t, dict) and t.get("id_int") is not None]
+        return True, ids
+    except Exception as e:
+        return False, f"线程列表解析失败: {e}"
+
+
+def _ensure_dbg(interface=2):
+    """确保调试器已附加(VEH=2 默认,隐蔽)。返回 (ok, err)。"""
+    ok, res = _call("debug_is_debugging", {})
+    if not ok:
+        return False, res
+    try:
+        if isinstance(res, dict) and res.get("is_debugging"):
+            return True, ""
+    except Exception:
+        pass
+    ok2, res2 = _call("debug_process", {"interface": interface})
+    if not ok2:
+        return False, res2
+    return True, ""
+
+
 def tool_ce(args):
     """CE 桥接。run("ce", action=..., ...)。
 
@@ -107,6 +162,10 @@ def tool_ce(args):
       analyze   函数调用/跳转分析(address=<函数入口> [count=200])
       instr     单条指令详情(address=<地址>)
       pause/unpause 冻结/恢复目标进程(稳定读数用)
+      threads   列线程(id_int 供 lbr/step 用)
+      lbr       LBR分支回溯:op=start开记录→用户做触发动作→op=read取最近分支对并标注(往前找关键调用,零单步)
+      step      单步trace:冻住thread单步count条,逐条记RIP+指令+[CRYPTO?/CALL/BRANCH]标注(往后找解密,完事自动恢复跑)
+      dbgdetach 摘掉调试器(trace季结束时调)
 
     地址接受 "game.exe+0x1234" 或 "0x..." 字符串。
     返回字符串;失败返回 "Error: ..."。"""
@@ -117,7 +176,8 @@ def tool_ce(args):
              "write", "watch", "hits", "unwatch", "eval",
              "signature", "aa", "aacheck", "asm", "refs", "rtti",
              "dissect", "ptrchain", "psearch", "analyze", "instr",
-             "pause", "unpause", "rint", "wint", "rstr"}
+             "pause", "unpause", "rint", "wint", "rstr",
+             "threads", "lbr", "step", "dbgdetach"}
     if action not in valid:
         return f"Error: 未知 action {action!r},应为 {sorted(valid)}\n\n正确用法:\n" + tool_ce.__doc__
 
@@ -352,6 +412,194 @@ def tool_ce(args):
                                             "max_length": get_int(args, "size", 256),
                                             "wide": get_str(args, "wide", "") not in ("", "0", "false")})
             return _fmt(ok, res, 2000)
+
+        if action == "threads":
+            ok, res = _call("get_thread_list", {"offset": get_int(args, "offset", 0),
+                                                "limit": get_int(args, "limit", 100)})
+            if not ok:
+                return _fmt(ok, res)
+            try:
+                lines = [f"线程 {len(res.get('threads') or [])} 个(thread= 传 id_int):"]
+                for t in (res.get("threads") or [])[:100]:
+                    lines.append(f"  id={t.get('id_int')} hex={t.get('id_hex')}")
+                return "\n".join(lines)
+            except Exception:
+                return _fmt(True, res)
+
+        if action == "lbr":
+            # LBR 分支记录:往前找关键调用,零单步,游戏几乎无感知。
+            # 流程: lbr op=start → 用户做触发动作 → lbr op=read(自动关)。
+            op = get_str(args, "op", "start").lower()
+            if op not in ("start", "read"):
+                return "Error: lbr 需要 op=start|read"
+            ok, err = _ensure_dbg(get_int(args, "interface", 2))
+            if not ok:
+                return _fmt(False, err)
+            tsel = get_str(args, "thread", "all")
+            if tsel.lower() == "all":
+                ok, tids = _thread_ids()
+                if not ok:
+                    return _fmt(False, tids)
+            else:
+                try:
+                    tids = [int(tsel, 0)]
+                except ValueError:
+                    return "Error: thread 应为数字 id(先 run('ce', action='threads') 看)或 all"
+            if op == "start":
+                fails = []
+                for tid in tids:
+                    ok, res = _call("debug_set_last_branch_recording",
+                                    {"thread_id": tid, "enabled": True})
+                    if not ok:
+                        fails.append(f"{tid}:{res}"[:100])
+                if fails and len(fails) == len(tids):
+                    return _fmt(False, "LBR 开启全部失败: " + "; ".join(fails[:3]))
+                return (f"LBR 已开({len(tids) - len(fails)}/{len(tids)} 线程)。"
+                        f"现在去游戏里做触发动作,然后 run('ce', action='lbr', op='read')"
+                        + (f" 失败:{fails[:3]}" if fails else ""))
+            # op == read: 取各线程最近分支对,反查目标指令并标注,读完即关
+            pairs_cap = min(max(get_int(args, "pairs", 16), 1), 32)
+            out = ["[LBR 分支回溯(每行: from → to 处指令,往前找关键调用)]"]
+            total = 0
+            for tid in tids:
+                ok, res = _call("debug_get_last_branch_record", {"thread_id": tid})
+                _call("debug_set_last_branch_recording", {"thread_id": tid, "enabled": False})
+                if not ok:
+                    continue
+                try:
+                    recs = res.get("records") or []
+                except Exception:
+                    continue
+                if not recs:
+                    continue
+                out.append(f"--- thread {tid} (最近 {min(len(recs), pairs_cap)} 对) ---")
+                for r in recs[-pairs_cap:]:
+                    if total >= 96:
+                        out.append("...(对数超限,加 pairs 调小范围)")
+                        break
+                    total += 1
+                    try:
+                        frm, to = r.get("from_address"), r.get("to_address")
+                    except Exception:
+                        continue
+                    okd, resd = _call("get_instruction_info", {"address": to})
+                    if okd and isinstance(resd, dict):
+                        text = str(resd.get("instruction", "?"))
+                        parts = text.split(None, 1)
+                        mn = parts[0].lower() if parts else ""
+                        ops = parts[1] if len(parts) > 1 else ""
+                        if resd.get("is_call"):
+                            flag = " [CALL]"
+                        elif resd.get("is_ret"):
+                            flag = " [RET]"
+                        elif resd.get("is_jump"):
+                            flag = " [BRANCH]"
+                        else:
+                            flag = _tag(mn, ops)
+                        line = f"{frm} → {to}: {text}{flag}"
+                    else:
+                        line = f"{frm} → {to}: (指令详情失败)"
+                    out.append(line)
+                if total >= 96:
+                    break
+            if total == 0:
+                return "LBR 无记录(触发动作可能没命中代码分支,或线程选错,换 thread 重试)"
+            return _fmt(True, "\n".join(out), 12000)
+
+        if action == "step":
+            # 单步采样:冻住一条线程,N 步内每步记 RIP+指令+标注,找解密/跟调用链。
+            # 用法: pause 住目标界面(或悬停加密值)→ step → 看 [CRYPTO?]/[CALL]。
+            ok, err = _ensure_dbg(get_int(args, "interface", 2))
+            if not ok:
+                return _fmt(False, err)
+            tsel = get_str(args, "thread", "")
+            if tsel:
+                try:
+                    tid = int(tsel, 0)
+                except ValueError:
+                    return "Error: thread 应为数字 id(先 run('ce', action='threads') 看)"
+            else:
+                ok, tids = _thread_ids(limit=20)
+                if not ok or not tids:
+                    return _fmt(False, tids if not ok else "无线程(游戏是否在跑?)")
+                tid = tids[0]
+            count = min(max(get_int(args, "count", 80), 1), 300)
+            stop_ret = get_str(args, "stop", "") == "ret"
+            method = "step_over" if get_str(args, "over", "") not in ("", "0", "false") else "step_into"
+            ok, res = _call("debug_break_thread", {"thread_id": tid})
+            if not ok:
+                return _fmt(False, f"冻线程失败: {res}(换个 thread 或确认游戏在跑)")
+            rip = None
+            for _ in range(12):  # 等线程停稳
+                ok, res = _call("debug_get_context", {"thread_id": tid})
+                if ok:
+                    try:
+                        rip = res.get("registers", {}).get("RIP") or res.get("registers", {}).get("Eip")
+                    except Exception:
+                        rip = None
+                    if rip:
+                        break
+                time.sleep(0.25)
+            if not rip:
+                _call("debug_continue", {"method": "run"})
+                return _fmt(False, "线程没停住(可能该线程正睡大觉,换个 thread 重试)")
+            try:
+                init_regs = res.get("registers", {}) if isinstance(res, dict) else {}
+            except Exception:
+                init_regs = {}
+            out = [f"[单步 trace thread={tid} 起点 {rip} 方法={method}"
+                   + (" 遇ret停" if stop_ret else "") + "]",
+                   "初始关键寄存器: " + ", ".join(
+                       f"{k}={init_regs.get(k)}" for k in ("RAX", "RBX", "RCX", "RDX", "RSI", "RDI") if init_regs.get(k))]
+            for i in range(count):
+                oki, resi = _call("get_instruction_info", {"address": rip})
+                if not oki or not isinstance(resi, dict):
+                    out.append(f"#{i} {rip}: (指令详情失败,停止)")
+                    break
+                text = str(resi.get("instruction", "?"))
+                parts = text.split(None, 1)
+                mn = parts[0].lower() if parts else ""
+                ops = parts[1] if len(parts) > 1 else ""
+                size = resi.get("size", "?")
+                if resi.get("is_call"):
+                    flag = " [CALL]"
+                elif resi.get("is_ret"):
+                    flag = " [RET]"
+                elif resi.get("is_jump"):
+                    flag = " [BRANCH]"
+                else:
+                    flag = _tag(mn, ops)
+                out.append(f"#{i} {rip} [{size}B] {text}{flag}")
+                if stop_ret and (resi.get("is_ret") or mn in ("ret", "retn", "retf")):
+                    out.append("(遇 ret,按 stop=ret 停止;函数可能返回,看调用方请对上层地址 lbr)")
+                    break
+                okc, _resc = _call("debug_continue", {"method": method})
+                if not okc:
+                    out.append("(单步继续失败,停止)")
+                    break
+                rip2 = None
+                for _ in range(6):
+                    okr, resr = _call("debug_get_context", {"thread_id": tid})
+                    if okr:
+                        try:
+                            rip2 = (resr.get("registers", {}).get("RIP")
+                                    or resr.get("registers", {}).get("Eip"))
+                        except Exception:
+                            rip2 = None
+                        if rip2:
+                            break
+                    time.sleep(0.1)
+                if not rip2:
+                    out.append("(取不到新 RIP,停止)")
+                    break
+                rip = rip2
+            _call("debug_continue", {"method": "run"})  # 松开线程,游戏恢复跑
+            out.append("(线程已恢复跑;调试器保持附加,用完 run('ce', action='dbgdetach') 摘掉)")
+            return _fmt(True, "\n".join(out), 12000)
+
+        if action == "dbgdetach":
+            ok, res = _call("debug_detach", {})
+            return _fmt(ok, res, 1000)
 
     except ValueError as e:
         return f"Error: 参数格式错误 - {e}"

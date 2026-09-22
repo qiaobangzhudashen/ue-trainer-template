@@ -27,6 +27,7 @@ description: UE/Unity 单机游戏修改器开发. Use when user mentions 游戏
 | 搜值/收窄 | `run("ce", action="scan"/"next"/"results", ...)` |
 | 反汇编门后判断 | `run("ce", action="dis", address=...)`；静态看文件用 `run("pe", ...)` |
 | 断点找写入者 | `run("ce", action="watch"/"hits", ...)`（≈CE的F5/F6），触发动作由用户做 |
+| 回溯调用/单步找解密 | `run("ce", action="lbr", op="start")`→做动作→`op="read"`；`run("ce", action="step", thread=..., count=...)`看`[CRYPTO?]` |
 | 定稿：唯一AOB/AA注入/指针链 | `run("ce", action="signature"/"aa"/"ptrchain", ...)`，AA先`aacheck`验语法 |
 | 查 dump 表 | `run("db", action="search", keyword=..., db=...)` |
 

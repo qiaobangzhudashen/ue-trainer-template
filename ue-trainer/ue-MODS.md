@@ -114,7 +114,7 @@
 ### 3.2b 搜不到数时的兜底路线（按顺序试）
 
 1. **未知初值/浮点/指针**：unknown 初扫 + 变动/不变/增加/减少收窄；浮点改类型重扫；疑似指针走 pointer scan（偏移链表达，版本漂移后 rescan 按“特定偏移结尾”过滤）。
-2. **无可见数值埋不了断点**（timer/结算类）：Ultimap/CodeFilter 记分支，以“门事件发生/未发生”两次过滤收敛热点；或 break-and-trace + 栈回溯，对比正常 vs 修改后执行流。
+2. **无可见数值埋不了断点**（timer/结算类）：Ultimap/CodeFilter 记分支，以“门事件发生/未发生”两次过滤收敛热点；或 break-and-trace + 栈回溯，对比正常 vs 修改后执行流。已可一键执行：`ce lbr op=start`→做动作→`op=read`看分支对（往前找调用），`ce step thread=<id> count=80`逐条看`[CRYPTO?]`（往后找解密），完事`ce dbgdetach`。
 3. **写指令被多对象复用**：看“这段代码访问了哪些地址”，用不同对象地址区分玩家/敌人/共享逻辑，顺藤找结构体基址；敌我字段用 dissect data 分组对比（组内同、组间异列即阵营字段）。
 4. **命中点是通用函数**：dissect code 画调用/引用图，门判断常是其上游唯一 jcc，向上找调用方分流。
 5. **Unity Mono**：Mono dissect 直接浏览托管类/方法并强制 JIT 出 native 地址，再转 AOB（跳过盲搜）。
