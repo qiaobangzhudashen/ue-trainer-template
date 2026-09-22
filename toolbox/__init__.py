@@ -99,8 +99,8 @@ TOOLS_META = {
     "ce": (
         "toolbox.ce",
         "tool_ce",
-        "CE 桥接(搜值/AOB/反汇编/读写内存/硬件断点,走命名管道,不点CE界面)",
-        "action=<ping|scan|next|results|aob|dis|read|write|watch|hits|unwatch|eval> [value=...] [type=dword] [scan_type=exact] [pattern=...] [address=...] [count=N] [size=N] [bytes=144,144] [access=w] [id=...] [code=...] [limit=N] [offset=N]",
+        "CE 桥接(搜值/AOB/反汇编/读写内存/硬件断点/AA注入/指针链,不点CE界面)",
+        "action=<ping|scan|next|results|aob|dis|read|write|watch|hits|unwatch|eval|signature|aa|aacheck|asm|refs|rtti|dissect|ptrchain|psearch|analyze|instr|pause|unpause> [value=...] [type=dword] [scan_type=exact] [pattern=...] [address=...] [base=...] [offsets=...] [script=...] [instruction=...] [string=...] [count=N] [size=N] [bytes=144,144] [access=w] [id=...] [code=...] [limit=N] [offset=N]",
     ),
     "info": (
         "toolbox.info",

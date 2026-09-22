@@ -88,10 +88,22 @@ def tool_ce(args):
       dis       反汇编(address=<地址> [count=N])
       read      读内存(address=<地址> size=<字节数>)
       write     写内存(address=<地址> bytes=<十进制逗号分隔,如144,144>)
-      watch     硬件断点(address=<地址> [access=r|w|rw] [id=...],最多4个)
+      watch     硬件断点(address=<地址> [access=r|w|rw] [id=...],最多4个;≈F5/F6)
       hits      取断点命中([id=...])
       unwatch   删断点(id=...)
       eval      执行CE Lua(code=<lua代码>)
+      signature 唯一AOB(address=<代码地址>;慢,全内存扫,只对定稿地址用)
+      aa        执行AA脚本(script=<含[ENABLE]文本>;先aacheck验语法)
+      aacheck   只验AA语法不执行(script=<文本>)
+      asm       单条汇编→机器码(instruction="mov eax, 1" [address=...])
+      refs      找哪些代码引用该地址(address=<地址> [limit=N])
+      rtti      vtable指针认C++类名(address=<地址>)
+      dissect   结构体剖析(address=<基址> [size=256])
+      ptrchain  指针链求值(base="game.exe+0x1234" offsets="0x10,0x20,0x8")
+      psearch   内存字符串搜索(string=<文本> [wide=0/1] [limit=N])
+      analyze   函数调用/跳转分析(address=<函数入口> [count=200])
+      instr     单条指令详情(address=<地址>)
+      pause/unpause 冻结/恢复目标进程(稳定读数用)
 
     地址接受 "game.exe+0x1234" 或 "0x..." 字符串。
     返回字符串;失败返回 "Error: ..."。"""
@@ -99,7 +111,10 @@ def tool_ce(args):
 
     action = get_str(args, "action", "").lower()
     valid = {"ping", "scan", "next", "results", "aob", "dis", "read",
-             "write", "watch", "hits", "unwatch", "eval"}
+             "write", "watch", "hits", "unwatch", "eval",
+             "signature", "aa", "aacheck", "asm", "refs", "rtti",
+             "dissect", "ptrchain", "psearch", "analyze", "instr",
+             "pause", "unpause"}
     if action not in valid:
         return f"Error: 未知 action {action!r},应为 {sorted(valid)}\n\n正确用法:\n" + tool_ce.__doc__
 
@@ -192,6 +207,107 @@ def tool_ce(args):
                 return "Error: eval 需要 code(Lua 代码)"
             ok, res = _call("evaluate_lua", {"code": code})
             return _fmt(ok, res, 4000)
+
+        if action == "signature":
+            addr = get_str(args, "address", "")
+            if not addr:
+                return ("Error: signature 需要 address(慢: 全内存扫, 只对代码地址用)。用法:\n"
+                        "  run('ce', action='signature', address='game.exe+0x5000')")
+            ok, res = _call("generate_signature", {"address": addr})
+            return _fmt(ok, res)
+
+        if action == "aa":
+            script = get_str(args, "script", "")
+            if not script:
+                return ("Error: aa 需要 script(AA 脚本, 含 [ENABLE]/[DISABLE])。用法:\n"
+                        "  run('ce', action='aa', script='[ENABLE]\\n...')  # 先 aacheck 验语法")
+            ok, res = _call("auto_assemble", {"script": script})
+            return _fmt(ok, res)
+
+        if action == "aacheck":
+            script = get_str(args, "script", "")
+            if not script:
+                return "Error: aacheck 需要 script(只验语法不执行)"
+            ok, res = _call("auto_assemble_check", {"script": script})
+            return _fmt(ok, res, 2000)
+
+        if action == "asm":
+            inst = get_str(args, "instruction", "")
+            if not inst:
+                return ("Error: asm 需要 instruction。用法:\n"
+                        "  run('ce', action='asm', instruction='mov eax, 1')")
+            p = {"instruction": inst}
+            if get_str(args, "address", ""):
+                p["address"] = get_str(args, "address")
+            ok, res = _call("assemble_instruction", p)
+            return _fmt(ok, res, 1000)
+
+        if action == "refs":
+            addr = get_str(args, "address", "")
+            if not addr:
+                return "Error: refs 需要 address(找哪些代码引用该地址)"
+            ok, res = _call("find_references", {"address": addr, "limit": get_int(args, "limit", 50)})
+            return _fmt(ok, res)
+
+        if action == "rtti":
+            addr = get_str(args, "address", "")
+            if not addr:
+                return "Error: rtti 需要 address(vtable 指针, 认 C++ 类名)"
+            ok, res = _call("get_rtti_classname", {"address": addr})
+            return _fmt(ok, res, 1000)
+
+        if action == "dissect":
+            addr = get_str(args, "address", "")
+            if not addr:
+                return "Error: dissect 需要 address(结构体基址)"
+            ok, res = _call("dissect_structure",
+                            {"address": addr, "size": get_int(args, "size", 256)})
+            return _fmt(ok, res)
+
+        if action == "ptrchain":
+            base = get_str(args, "base", "")
+            offs = get_str(args, "offsets", "")
+            if not base or not offs:
+                return ("Error: ptrchain 需要 base+offsets。用法:\n"
+                        "  run('ce', action='ptrchain', base='game.exe+0x1234', offsets='0x10,0x20,0x8')")
+            try:
+                arr = [int(x, 0) for x in offs.split(",")]
+            except ValueError:
+                return "Error: offsets 格式错误,应为逗号分隔(如 0x10,0x20,0x8)"
+            ok, res = _call("read_pointer_chain", {"base": base, "offsets": arr})
+            return _fmt(ok, res)
+
+        if action == "psearch":
+            s = get_str(args, "string", "")
+            if not s:
+                return "Error: psearch 需要 string(内存字符串搜索)"
+            ok, res = _call("search_string", {"string": s,
+                                              "wide": get_str(args, "wide", "") not in ("", "0", "false"),
+                                              "limit": get_int(args, "limit", 20)})
+            return _fmt(ok, res)
+
+        if action == "analyze":
+            addr = get_str(args, "address", "")
+            if not addr:
+                return "Error: analyze 需要 address(函数入口, 画调用/跳转)"
+            ok, res = _call("analyze_function",
+                            {"address": addr, "max_instructions": get_int(args, "count", 200)})
+            return _fmt(ok, res)
+
+        if action == "instr":
+            addr = get_str(args, "address", "")
+            if not addr:
+                return "Error: instr 需要 address(单条指令详情)"
+            ok, res = _call("get_instruction_info", {"address": addr})
+            return _fmt(ok, res, 2000)
+
+        if action == "pause":
+            ok, res = _call("pause_process", {})
+            return _fmt(ok, res, 1000)
+
+        if action == "unpause":
+            ok, res = _call("unpause_process", {})
+            return _fmt(ok, res, 1000)
 
     except ValueError as e:
         return f"Error: 参数格式错误 - {e}"
