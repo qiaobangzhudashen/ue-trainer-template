@@ -2,7 +2,9 @@
 -- 约定: 外部 UI 写 cmd.txt 下发命令,本脚本 LoopAsync 轮询执行,结果写 [LVT] 日志.
 -- agent 任务: 按目标游戏六问填 GIVE_FUNC / FREE_HOOKS,其余不动.
 
-local MOD_NAME = "GameTrainer"
+-- 复制到 ue4ss/Mods/<本游戏Mod名>/Scripts/main.lua 后,第一行必须改成该 Mod 名
+-- (须与 mods.txt 里 "<Name> : 1" 一致,否则 cmd.txt 路径对不上,UI 命令发不进来)。
+local MOD_NAME = "GameTrainer"  -- TODO(agent): 改成目标 Mod 名
 
 local function LVT(s) print("[LVT] " .. s) end
 
@@ -18,7 +20,8 @@ end
 -- ============ 2. 免费 hook (检查端放行,按游戏换) ============
 local free_hooks = {}  -- {handle1, handle2...}
 local function FreeOn()
-    -- TODO(agent): RegisterHook(检查函数全路径, function(self,...) return true end)
+    -- TODO(agent): RegisterHook(检查函数全路径, function(self,...) return <放行值> end)
+    -- 注意:回调 return 非 nil 即覆盖原返回值,先确认目标函数返回值语义再决定放行值
     -- 例: CheckResources + TipsCheckResources 双 hook
     LVT("free on (TODO: 填真 hook)")
 end

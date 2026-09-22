@@ -19,14 +19,24 @@ try:
 except ImportError:
     yaml = None
 
-from engine import db as dbmod
+from engine import items as dbmod
 from engine import lua_bridge as bridge
 from engine import memory as memmod
 
 
+def _resource(*parts):
+    """游戏数据文件定位: exe 同目录优先(打包后可直接改 yaml 不用重打),
+    回退到源码 BASE(开发期)。"""
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+    p1 = os.path.join(exe_dir, *parts)
+    if os.path.exists(p1):
+        return p1
+    return os.path.join(BASE, *parts)
+
+
 def load_game(slug):
     import io
-    path = os.path.join(BASE, 'games', slug, 'game.yaml')
+    path = _resource('games', slug, 'game.yaml')
     with io.open(path, encoding='utf-8') as f:
         text = f.read()
     if yaml:
@@ -52,7 +62,7 @@ class App(tk.Tk):
         self.title('UE Trainer - %s' % slug)
         self.geometry('860x640')
         self.mem = memmod.GameMemory(self.cfg) if self.cfg.get('patches') else None
-        items_path = os.path.join(BASE, 'games', slug, 'items.txt')
+        items_path = _resource('games', slug, 'items.txt')
         try:
             self.items = dbmod.load_items(items_path) if os.path.exists(items_path) else []
         except Exception as ex:

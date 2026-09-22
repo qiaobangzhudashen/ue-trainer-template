@@ -95,6 +95,13 @@
 - 批量发奖/刷屏类操作先小批量试，再全量；功法秘籍类常有单品上限，小批量验证。
 - 验证用**秒级对照**（写后立刻读），分钟级对照会被生产 tick 污染出假阳性。
 
+**Hook 返回值语义（检查函数放行的唯一正确口径）：** 回调 `return` 非 nil 即覆盖原返回值，`return nil`/无 return 则保留原值；`/Script/` 开头路径支持 pre（第2参）+post（第3参），BP 路径只用第2参；delegate 不支持，被 hook 函数须已在内存；返回的 PreId/PostId 双 ID 注销。不要把“return true 放行”当通用模板——先确认目标函数返回值语义。
+**读改入参：** hook 回调首参是 Context（this），余参按 UFunction 签名逐个包 `RemoteUnrealParam`，一律经 `get()` 读、`set()` 写，不猜内存布局。
+**游戏线程封送：** 对象创建/调官方发奖包 `ExecuteInGameThread(fn)`（外部桥回调里直接调官方函数会崩）。
+**场景限定对象：** `FindFirstOf` 拿不到的动态/场景对象用 `NotifyOnNewObject(类路径, fn)` 监听构造（含派生类），回 `true` 即单次注销。
+**驱动三选一：** `cmd.txt` 文件桥（默认）/ `RegisterKeyBind` 游戏内热键（控制台聚焦才触发）/ `RegisterConsoleCommandHandler` 自定义控制台命令（回 `true` 截断）。验证=按热键/敲命令看日志。
+**容器只调官方 API：** `TMap:Find/Add/Contains/Remove/Empty/ForEach`，`TArray` 1 基下标/`#arr`/`ForEach((i,elem))`（`elem:get()/set()`）/`Empty()`；只改已存在元素，批量先小量试。
+
 ### 3.2 CE（native 层）：搜→断→反→补丁
 
 1. **搜**：拿用户可见的精确数（如某材料拥有量）做首扫，用官方发奖加一笔做收窄（几百→1，常一步到位）；0 值不搜。
@@ -102,7 +109,16 @@
 3. **反**：顺藤找比较+跳转（`cmp/test/comiss + jcc`）；**用户可见门后的第一个判断就是目标**，不要顺着藤摸出三里地。
 4. **补丁**：nop/jmp 最小改；简单覆盖不了时（条件分支/寄存器保护/只对特定对象生效）用代码洞：原地写 E9 跳到申请的内存，执行完跳回（见 3.3 cave 约定）；载体统一 `aobscanmodule` 限定主模块（全局 `aobscan` 卡 UI 约 10 秒）；**特征码不得包含补丁位自身**（否则打上补丁后自己搜不到自己）。
 5. **成对意识**：检查放行后，扣除侧变负会走它自己的不足分支——检查与扣除补丁成对出现，一开全开。
-6. **Mono 符号只做开发期定位**：Unity 游戏（IL2CPP/Mono）在 CE 里可用 Mono 方法名+偏移（`LaunchMonoDataCollector` + `Class.Method+偏移`）快速定位，但那是 JIT 地址，每次会变；成品一律转成所在模块（常为 `GameAssembly.dll`）上的 AOB，按普通补丁走。
+6. **Mono 符号只做开发期定位**：Unity 游戏（IL2CPP/Mono）在 CE 里可用 Mono 方法名+偏移（`LaunchMonoDataCollector` + `Class.Method+偏移`）快速定位，但那是 JIT 地址，每次会变；成品一律转成所在模块（常为 `GameAssembly.dll`）上的 AOB，按普通补丁走。迁移链：Mono 定位 → 同版本空白工程 PDB 在 x64dbg 提特征 → 目标游戏验证 → 落 AOB（`game.yaml` 不留悬空 TODO）。
+
+### 3.2b 搜不到数时的兜底路线（按顺序试）
+
+1. **未知初值/浮点/指针**：unknown 初扫 + 变动/不变/增加/减少收窄；浮点改类型重扫；疑似指针走 pointer scan（偏移链表达，版本漂移后 rescan 按“特定偏移结尾”过滤）。
+2. **无可见数值埋不了断点**（timer/结算类）：Ultimap/CodeFilter 记分支，以“门事件发生/未发生”两次过滤收敛热点；或 break-and-trace + 栈回溯，对比正常 vs 修改后执行流。
+3. **写指令被多对象复用**：看“这段代码访问了哪些地址”，用不同对象地址区分玩家/敌人/共享逻辑，顺藤找结构体基址；敌我字段用 dissect data 分组对比（组内同、组间异列即阵营字段）。
+4. **命中点是通用函数**：dissect code 画调用/引用图，门判断常是其上游唯一 jcc，向上找调用方分流。
+5. **Unity Mono**：Mono dissect 直接浏览托管类/方法并强制 JIT 出 native 地址，再转 AOB（跳过盲搜）。
+6. **版本漂移保命**：AA 一律用注入模板（Template→Code/Full injection，64 位远跳按 Ctrl 生成）；`assert` 校验补丁前缀、`readMem` 快照原字节；CE 侧开 speedhack 降速冻结计时类逻辑争取扫描反应时间。
 
 ### 3.3 成品内存层（去 CE 化，单 exe 的关键）
 
@@ -151,6 +167,8 @@
 | 打上补丁后重搜不到 | 特征码含补丁位 | 特征码只取补丁前前缀 |
 | 6 字节短 AOB 新版本失效 | 正常损耗 | 重走搜→断→反→补丁，不要硬套旧码 |
 | 游戏更新后全挂 | 基址/AOB/签名漂移 | 按第 1 节重走侦察，先验 AOB 唯一性 |
+| 补丁开后重进/读档/切场景失效 | hook 纯内存 + 场景限定对象 | 重开 hook（以日志为准）；场景对象改 NotifyOnNewObject 监听 |
+| CE 里搜到、成品搜不到 | 特征码含补丁位/模块名写错 | 特征码只取补丁前前缀；`module` 与 game.yaml 一致（UE 主模块/Unity GameAssembly.dll） |
 | 敏感操作后崩溃有时无 dump | 非受控退出（如 Text 传参挂起线程） | 该类入口直接禁用，走存档流程 |
 
 ### 5.3 回滚

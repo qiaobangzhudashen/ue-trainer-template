@@ -34,7 +34,7 @@
 - `[ ]` 游戏 EXE
 - `[ ]` `*_Data/Managed`
 - `[ ]` `GameAssembly.dll`
-- `[ ]` `il2cpp_data/Metadata/global-metadata.dat`
+- `[ ]` `*_Data/il2cpp_data/Metadata/global-metadata.dat`
 - `[ ]` `BepInEx/core`
 - `[ ]` `BepInEx/interop`
 - `[ ]` 反编译输出

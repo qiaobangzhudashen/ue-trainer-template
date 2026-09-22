@@ -91,7 +91,9 @@ class GameMemory:
         if name in self.addrs:
             return self.addrs[name]
         spec = self.cfg['patches'][name]
-        mod = pymem.process.module_from_name(self.pm.process_handle, self.exe)
+        # Unity(IL2CPP)等游戏代码在 GameAssembly.dll，主模块名由 game.yaml 的 module 指定
+        mod_name = self.cfg.get('module') or self.exe
+        mod = pymem.process.module_from_name(self.pm.process_handle, mod_name)
         addr = pymem.pattern.pattern_scan_module(
             self.pm.process_handle, mod, re.escape(bytes.fromhex(spec['aob'])))
         if not addr:

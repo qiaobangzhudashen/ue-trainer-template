@@ -17,6 +17,13 @@ Unity 游戏 BepInEx 插件式 MOD 开发：游戏内 DLL，走官方 API 读改
 
 静态侦察 → 构型判定（Mono/IL2CPP 证据）→ 确认 BepInEx 分支与启动 → 六问未完成不写业务代码 → 最小用例（读一改一重读）→ 归档。
 
+## 工具（toolbox 包，只读侦察）
+
+`D:/skills/toolbox/`：`run("pe", action="exports", path=...)` 看程序集导出；
+`run("shot_ocr", window=...)` 看游戏内 UI；`run("db", ...)` 查表；
+`run("info")` 查环境。`click/key` 仅输入验证用，`ce` 的写内存仅 UE 路线用——
+BepInEx 路线写入一律走游戏内插件，不走本包。
+
 ## 铁律
 
 - 通用方法进 `unity-MODS.md`，游戏私货（类名、枚举、签名、路径）只进该游戏 `MOD-MEMORY.md`。

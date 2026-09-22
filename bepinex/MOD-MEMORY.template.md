@@ -1,7 +1,7 @@
 # MOD-MEMORY
 
 > 当前游戏的已验证事实、项目进度和回滚信息。不要把未经运行时验证的猜测写成结论。
-> 通用方法论请参考 `unity-MODS.md`；新游戏开工记录请参考 `GAME-SCOUT.md`。
+> 通用方法论请参考 `unity-MODS.md`；新游戏开工记录请参考 `GAME-SCOUT.template.md`。
 
 ## 1. 项目概览
 

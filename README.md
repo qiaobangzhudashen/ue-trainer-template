@@ -9,6 +9,7 @@
 | `ue-trainer/` | 通用方法论 SKILL：分层、侦察六问、搜→断→反→补丁、代码洞约定 | `SKILL.md` → `ue-MODS.md` |
 | `bepinex/` | Unity BepInEx 插件 MOD 方法论 SKILL（游戏内 DLL 路线） | `SKILL.md` → `unity-MODS.md` |
 | `ue-trainer-template/` | 源码模板：通用 UI + 内存引擎 + Lua 模板，新游戏只填一个 `game.yaml` | `README.md` |
+| `toolbox/` | 侦察工具包（截图/OCR/PE/DB/CE桥，只读+CE驱动，不点界面） | `toolbox/README.md` |
 
 `ue-trainer-template/games/` 下带两个实战例子（`lostvillage`、`idledevils`），`_template` 是空脚手架。
 

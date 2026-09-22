@@ -7,13 +7,14 @@
 ## 目录
 
 ```
-engine/memory.py      内存引擎 (bytes + cave,游戏无关,不动)
+engine/memory.py      内存引擎 (bytes + cave,游戏无关,不动;module 取 game.yaml)
 engine/lua_bridge.py  cmd.txt + 日志桥 (不动)
-engine/db.py          items.txt 读取 (不动)
-ui/app.py             通用界面 (读 game.yaml 驱动,不动)
-lua/template_main.lua Lua 模板 (每个游戏复制改 GIVE/HOOK 段)
+engine/items.py       items.txt 读取 (不动;原名 db.py,与 toolbox 查表 db 重名已改)
+ui/app.py             通用界面 (读 game.yaml 驱动,不动;exe 同目录优先)
+lua/template_main.lua Lua 模板 (每个游戏复制改 MOD_NAME/GIVE/HOOK 段)
 games/_template/      空配置 (新游戏起点)
 games/lostvillage/    山门示例 (4 个 bytes 补丁已迁移验证)
+tools/asm.py          cave 组装(keystone)+反汇编复核(capstone,制作期用)
 tools/build.py        PyInstaller 单 exe 打包
 tools/new_game.py     新游戏脚手架
 ```
