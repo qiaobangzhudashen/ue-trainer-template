@@ -1,0 +1,5 @@
+pymem>=1.14
+pyinstaller>=6
+pyyaml>=6
+# 制作期 (组装 cave_hex 用,运行时不需要):
+# keystone-engine>=0.9 capstone>=5

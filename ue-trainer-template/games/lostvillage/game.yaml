@@ -1,0 +1,47 @@
+# 山门与幻境:从 lostvillage-trainer/tools/mem.py 迁移,4 个 bytes 补丁原样保留.
+# agent 备注: cave 示例见 games/_template/game.yaml,本游戏暂无 cave 需求不启用.
+game: lostvillage
+exe: TheLostVillage-Win64-Shipping.exe
+mod_rel: TheLostVillage/Binaries/Win64/ue4ss/Mods/LostVillageTrainer
+give_func: BirdLetterSystem:AwardSomeItems
+
+patches:
+  nospend:
+    desc: 扣除不扣float管线 (Deduct subss nop)
+    type: bytes
+    aob: "66410F6E4104F3410F104C10740F5BC0"
+    offset: 0x10
+    on_bytes: "90909090"
+    off_bytes: "F30F5CC8"
+  checkpass:
+    desc: 检查放行float管线 (需求-拥有 ja nop)
+    type: bytes
+    aob: "0FB6837C070000F30F5CC10F2FC2"
+    offset: 0x0E
+    on_bytes: "909090909090"
+    off_bytes: "0F87B0010000"
+  upgcheck:
+    desc: 升级检查放行int管线 (jge->jmp)
+    type: bytes
+    aob: "F3440F2C4174"
+    offset: 0x0D
+    on_bytes: "EB18"
+    off_bytes: "7D18"
+  upgdeduct:
+    desc: 升级扣除int管线 (jl nop)
+    type: bytes
+    aob: "F3440F2C4974"
+    offset: 0x0A
+    on_bytes: "9090"
+    off_bytes: "7C13"
+
+toggles:
+  free:
+    label: 免费模式 (无视材料检查, 商店/建造/研究随便点)
+    lua_on: lv_free on
+    lua_off: lv_free off
+    mem: [nospend, checkpass, upgcheck, upgdeduct]
+
+packs:
+  - name: 研究材料包 (残页/太古智慧)
+    items: [[5013, 999], [5201, 999]]

@@ -1,0 +1,51 @@
+# 空闲魔王 IdleDevils.exe (Unity IL2CPP,模块 GameAssembly.dll)
+# 从 "IdleDevils.exe (已暂停).ct" 迁移.迁移规则:
+#  纯 db 覆盖 -> type: bytes ; alloc+jmp -> type: cave (hex 由 tools/asm.py 组装,capstone 复核).
+#  Mono 符号定位 (LaunchMonoDataCollector + 方法名+偏移) 按次 JIT 地址会变,
+#  成品一律转成 GameAssembly.dll 上的 AOB,本文件 ID15/ID30 留 TODO 待补 AOB.
+game: idledevils
+exe: IdleDevils.exe
+module: GameAssembly.dll
+mod_rel: ''
+
+patches:
+  # CT ID58 魔力值不增不减: 原地 3 字节 nop (movaps xmm0,xmm6 干掉,addss 保留)
+  mp_lock:
+    desc: 魔力值不增不减
+    type: bytes
+    aob: "0F28C6F30F5800"
+    offset: 0x0
+    on_bytes: "909090F30F5800"
+    off_bytes: "0F28C6F30F5800"
+
+  # CT ID55 无敌秒杀: 条件洞. [rbx+20]==2 走原逻辑 (敌方承伤),
+  # 否则 xmm8 清零 (我方无伤). overwrite 7 字节 = jmp(5)+nop2.
+  # hex 由 asm.py 组装,洞内 jne/jmp 相对偏移已一次算好,引擎只追加尾部跳回.
+  wudi_miaosha:
+    desc: 无敌秒杀 (条件洞)
+    type: cave
+    aob: "410F28C8488BCBFF"
+    offset: 0x0
+    overwrite_len: 7
+    off_bytes: "410F28C8488BCB"
+    cave_hex: "9C837B2002750E440F28C09D410F28C84889D9EB0D9D66450FEFC0410F28C84889D9"
+
+  # CT ID43 经验倍数: 条件洞 + 8 字节数据区 (倍数,0=关闭).
+  # 洞内两个 0xAAAAAAAAAAAAAAAA 占位,引擎回填数据区地址并清零.
+  # UI 开补丁后往 cave_data('exp_multi') 写 int64 倍数即可.
+  # overwrite 9 字节 = jmp(5)+nop4.
+  exp_multi:
+    desc: 经验倍数 (数据洞,倍数写数据区)
+    type: cave
+    aob: "4C8B77184C89742448"
+    offset: 0x0
+    overwrite_len: 9
+    off_bytes: "4C8B77184C89742448"
+    data_size: 8
+    cave_hex: "9C5048B8AAAAAAAAAAAAAAAA4883380058741C5053488B471848BBAAAAAAAAAAAAAAAA488B1B48F7E3488947185B589D4C8B77184C89742448"
+
+  # TODO(agent): CT ID15 金币 / ID30 塔层数是 Mono 方法偏移定位
+  # (Idle.Managers.DataManager.get_gold+d / TowerPanel.get_magicTowerSelectFloor+88),
+  # 需在 GameAssembly.dll 上抓等价 AOB 后按上面格式补.
+  # 注意 CT ID75 原脚本有 bug: ENABLE 写 13renwu-BA 但 DISABLE 回填字节与 AOB 对不上
+  # (48 89 43 18... vs 48 8B 40 10...),迁移时以实测 AOB 为准重做,勿照抄.
