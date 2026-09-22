@@ -156,6 +156,11 @@ def _bepinex_status(game_root, mod_dll_name):
     return dll_ok, hijack_ok
 
 
+def bepinex_status(game_root, mod_dll_name):
+    """只读状态：返回 (dll_ok, hijack_ok)，UI 自检用，不写文件。"""
+    return _bepinex_status(game_root, mod_dll_name)
+
+
 def ensure_bepinex_present(game_root, mod_dll_name, payload_dir=None):
     """BepInEx 版三件套：劫持链 + 本体目录 + plugins/<mod>.dll。
 

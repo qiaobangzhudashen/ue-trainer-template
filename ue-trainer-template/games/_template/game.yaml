@@ -1,13 +1,33 @@
 # 新游戏只填这个文件.引擎和UI不动.
 # agent 工作流: CE 里搜断反补丁调通后,把 AOB/偏移/开字节/关字节填进来;
 # 需要申请内存的复杂逻辑用 type: cave,把 CE 里调通的机器码贴进 cave_hex.
+# UE 与 Unity 共用本模板,互不影响: 缺 engine/bridge 字段即按 UE 旧行为回退.
 
 game: _TEMPLATE
 exe: Game-Win64-Shipping.exe
 # version: 1.0.0  # 游戏版本,AOB 失效时先对版本(按 AOB 三律重走搜断反补丁)
-# Mod 在游戏目录下的相对路径 (UE4SS Mod 目录)
+
+# ---- 引擎分流 (UE/Unity 通用,以后直接套用) ----
+# engine: ue | unity-mono | unity-il2cpp
+# bridge: ue4ss | bepinex-file | none
+#   ue + ue4ss: UE4SS Lua 外部桥 (山门路线)
+#   unity-mono + none: 纯内挂 IMGUI,无外部桥 (侠影录默认,最稳)
+#   unity-mono/unity-il2cpp + bepinex-file: 预留外部桥 (与 ue4ss 同构,另议)
+# module: 内存补丁扫哪个模块. UE 写 '' (即 exe 主模块);
+#   IL2CPP 写 GameAssembly.dll; Mono 写 //harmony-only (明示不走 AOB,走 Harmony)
+engine: ue
+bridge: ue4ss
+module: ''
+# Steam 自动定位 (EXE 一键部署用,找不到转手动选择+ini 记忆)
+steam_app_id: ''
+game_dirname: ''
+# Mod 在游戏目录下的相对路径 (UE4SS Mod 目录; Unity 内挂时留空)
 mod_rel: Game/Binaries/Win64/ue4ss/Mods/GameTrainer
-# 官方发奖函数 (Lua 侧用,物品添加走这条,不走内存)
+# Unity BepInEx 专用 (UE 留空): 插件文件名 + 日志相对路径 + 回显 tag
+plugin_dll: ''
+log_rel: ''
+tag: '[LVT]'
+# 官方发奖函数 (Lua 侧用,物品添加走这条,不走内存; Unity 内挂不走此链)
 give_func: BirdLetterSystem:AwardSomeItems
 
 patches:

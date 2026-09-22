@@ -2,7 +2,16 @@
 # agent 备注: cave 示例见 games/_template/game.yaml,本游戏暂无 cave 需求不启用.
 game: lostvillage
 exe: TheLostVillage-Win64-Shipping.exe
+# 引擎分流: UE 回归机,缺字段即旧行为,此处显式写全供新游戏抄
+engine: ue
+bridge: ue4ss
+module: ''
+steam_app_id: '1963040'
+game_dirname: 'TheLostVillage'
 mod_rel: TheLostVillage/Binaries/Win64/ue4ss/Mods/LostVillageTrainer
+plugin_dll: ''
+log_rel: ''
+tag: '[LVT]'
 give_func: BirdLetterSystem:AwardSomeItems
 
 patches:

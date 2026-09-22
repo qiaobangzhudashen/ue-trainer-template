@@ -17,6 +17,17 @@ description: UE/Unity 单机游戏修改器开发. Use when user mentions 游戏
 
 游戏根目录 / 需求原文（一句话）/ 该游戏的 `MOD-MEMORY.md`（新游戏则新建）。
 
+## 开工第 0 步：引擎判定（先于一切，不猜）
+
+拿到游戏根目录先扫目录定引擎，结果填 `game.yaml: engine`，后续路线、桥、打包全跟它走：
+
+- `Engine/` 目录（`Content/Paks/*.pak` 常嵌在内层游戏目录下）→ Likely UE，走本技能（UE4SS + CE/AOB，打包 Trainer）。
+- `*_Data/` + `UnityPlayer.dll`，且有 `Managed/*.dll` → Likely Unity-Mono，转 bepinex 技能（BepInEx + Harmony，不走 AOB，打包 Setup 安装器）。
+- `GameAssembly.dll` + `global-metadata.dat` → Likely Unity-IL2CPP，两边文档都读，六问后再定。
+- 冲突或都无 → 停下问用户，不套用上一游戏的结论。
+
+`BepInEx/`、`ue4ss/` 目录只能证明已改装，不能证明引擎。判错路线比不判更贵。
+
 ## 工具（toolbox 包，不点 CE 界面）
 
 `D:/skills/toolbox/`（`import toolbox; toolbox.run(...)`，CLI 在 `D:/skills` 下 `python -m toolbox`）：
@@ -37,6 +48,7 @@ CE 未就绪时 `ce` 返回 Error 自查提示，不抛异常。
 ## 铁律
 
 - 通用方法进 `ue-MODS.md`，游戏私货（类名、AOB、补丁字节、ID）只进该游戏 `MOD-MEMORY.md`。
+- 模板目录边界：只改模板通用层（`engine/`、`ui/`、`tools/`、`lua/`、`games/_template/`）；新游戏从 `_template` 复制到自家工程目录再填，验证完也不写回模板（模板内已有示例仅归档）。
 - 物品添加走官方发奖链（Lua），免材料/不扣/锁值走内存补丁；一勾联动，同开同关，退出即恢复。
 - CE 只做开发期，成品走 `engine/memory.py`（bytes + cave + data 区），`tools/build.py` 打单 exe。
 - 本机路径（换机器时覆盖）：模板 `D:/skills/ue-trainer-template`，CE 桥 Lua 侧 `D:/opencode/ce-bridge/MCP_Server/ce_mcp_bridge.lua`（放 CE autorun），Python 直连脚本 `D:/opencode/ce-bridge/ce_direct.py`（toolbox 的 `ce` 工具与它同协议）。

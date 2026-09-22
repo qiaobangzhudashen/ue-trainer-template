@@ -19,7 +19,13 @@
 
 ## 1. 新游戏开工主流程
 
-1. **静态侦察**：找游戏 EXE、`Content/Paks/*.pak`、`Engine/` 目录；引擎版本从崩溃报告（`Saved/Crashes/CrashContext.runtime-xml`，`++UE5+Release-x.y`）或 EXE 内版本串确认。
+1. **静态侦察 + 引擎判定（先于一切）**：先扫目录定引擎，再选路线，不猜：
+   | 看到 | 判定 | 路线 |
+   |---|---|---|
+   | `Engine/` 目录（`Content/Paks/*.pak` 常嵌在内层游戏目录下） | Likely UE | 走本流程（UE4SS + CE/AOB，打包 Trainer） |
+   | `*_Data/` + `UnityPlayer.dll` + `Managed/*.dll` | Likely Unity-Mono | 转 bepinex 技能（BepInEx + Harmony，不走 AOB，打包 Setup 安装器） |
+   | `GameAssembly.dll` + `global-metadata.dat` | Likely Unity-IL2CPP | 两边文档都读，六问后再定 |
+   判定只看目录证据（`BepInEx/`、`ue4ss/` 只能证明已改装，不能证明引擎）；冲突或都无即停下问用户。结果填 `game.yaml: engine` + `MOD-MEMORY.md` 环境，后续 bridge/module/打包全部跟它走。UE 版本从崩溃报告（`Saved/Crashes/CrashContext.runtime-xml`，`++UE5+Release-x.y`）或 EXE 内版本串确认。
 2. **装 UE4SS**：版本必须覆盖目标引擎（老版扫不出 GUObjectArray 就换 experimental 新构建）；`EngineVersionOverride` 留空自动识别；**关闭自动热重载**，只用手动 Ctrl+R（自动重载已实锤导致崩溃）；但部署/补齐时必须把 `EnableHotReloadSystem` 置 `1`（自带包默认 `0`，此时 Ctrl+R 全局无反应）。
 3. **确认启动**：Steam 是否必须运行、启动后注入是否成功（示例：`dwmapi.dll` 代理）、`ue4ss/UE4SS.log` 有无报错。
 4. **确认输入**：游戏内控制台开启方式（示例：`~`/F10）、Ctrl+R 重载、热键位；输出双通道（控制台回显 + `UE4SS.log`）。
@@ -40,7 +46,7 @@
 - 双注册（experimental 3.x 真认的是 `Mods/mods.json`，`mods.txt` 只是 load order）：两边都要有 `<Name>`，缺一边即静默跳过——日志表现为到 `Keybinds` 就 `Event loop start`，无报错、无 `loaded`、无 `Error loading`。`mods.txt` 必须干净无空行无注释行；每次解包/更新 UE4SS 后重验两边。
 - 改完脚本部署后游戏内 **Ctrl+R 一次**，看到 `loaded` 回显才算数；按之前先关游戏内控制台、游戏窗口聚焦，否则按键被输入框吃掉。
 - **顺序铁律：先开修改器（补本体 + 双注册 + Scripts），再开游戏。** 启动瞬间注册表就必须就位；新用户/Steam 更新后首次必须走这个顺序。
-- 修改器启动自动体检三件套（缺一不可，进 `engine/deploy.py` 复用）：①校验注入本体（代理 dll + `ue4ss/` 目录，缺即用自带 zip 补，zip 打进 exe，只补缺项）②双注册修复 + `EnableHotReloadSystem=1` ③发通道探针（如下发 `lv_help` 等 `exec done`，超时判死）。补完本体必须提示**重启一次游戏**，不要在本局继续测。
+- 修改器启动自动体检三件套（缺一不可，进 `engine/deploy.py` 复用：UE 用 `ue_auto_setup`，Unity 用 `ensure_bepinex_present`；目录定位走 `tools/steam_find.py`）：①校验注入本体（代理 dll + `ue4ss/` 目录，缺即用自带包补，自带包打进 exe，只补缺项）②双注册修复 + `EnableHotReloadSystem=1` ③发通道探针（如下发 `lv_help` 等 `exec done`，超时判死）。补完本体必须提示**重启一次游戏**，不要在本局继续测。
 - **hook 是纯内存的**：重载/重启即失效，用前重开（如免费开关），以日志回显为准，不要凭记忆。
 - 外部 UI 下发命令走桥接文件：写 `.tmp` 再整体替换成 `cmd.txt`（防读半截），游戏内 `LoopAsync` 轮询执行，结果只回 `UE4SS.log`（`[LVT]` 前缀），执行后文件清空。
 - `启动修改器UI.bat` 必须纯 ASCII（中文路径/命令会碎）。
@@ -50,6 +56,7 @@
 - 每个游戏一个工程根目录：下载的工具（UE4SS 包、CE 桥）、制作的源码（`Scripts/`、UI、内存层）、`dumps/`、`*.CT`、ID 对照表、`MOD-MEMORY.md` 全在里面，不散落。
 - 新会话用户只报工程根目录，agent 不再全盘搜索；续活时路直接续，不重找。
 - 通用文档放 `D:\skills\ue-trainer\`，游戏私货不出工程目录；第三方原包保留版本号命名，删了就把下载地址记进第 7 节。
+- 模板只改通用层：新游戏配置从 `games/_template/` 复制到自家工程目录再填，不在模板内新建游戏目录，验证完也不写回模板（模板内已有示例仅归档）。
 
 ---
 
@@ -112,7 +119,7 @@
 3. **反**：顺藤找比较+跳转（`cmp/test/comiss + jcc`）；**用户可见门后的第一个判断就是目标**，不要顺着藤摸出三里地。
 4. **补丁**：nop/jmp 最小改；简单覆盖不了时（条件分支/寄存器保护/只对特定对象生效）用代码洞：原地写 E9 跳到申请的内存，执行完跳回（见 3.3 cave 约定）；载体统一 `aobscanmodule` 限定主模块（全局 `aobscan` 卡 UI 约 10 秒）；**特征码不得包含补丁位自身**（否则打上补丁后自己搜不到自己）。
 5. **成对意识**：检查放行后，扣除侧变负会走它自己的不足分支——检查与扣除补丁成对出现，一开全开。
-6. **Mono 符号只做开发期定位**：Unity 游戏（IL2CPP/Mono）在 CE 里可用 Mono 方法名+偏移（`LaunchMonoDataCollector` + `Class.Method+偏移`）快速定位，但那是 JIT 地址，每次会变；成品一律转成所在模块（常为 `GameAssembly.dll`）上的 AOB，按普通补丁走。迁移链：Mono 定位 → 同版本空白工程 PDB 在 x64dbg 提特征 → 目标游戏验证 → 落 AOB（`game.yaml` 不留悬空 TODO）。
+6. **Mono 符号只做开发期定位，成品按构型分流**：Unity 游戏在 CE 里可用 Mono 方法名+偏移（`LaunchMonoDataCollector` + `Class.Method+偏移`）快速定位，但那是 JIT 地址，每次会变。IL2CPP 成品转成 `GameAssembly.dll` 上的 AOB（迁移链：Mono 定位 → 同版本空白工程 PDB 在 x64dbg 提特征 → 目标游戏验证 → 落 AOB，`game.yaml` 不留悬空 TODO）；**Mono 成品不转 AOB，走 Harmony（见下 §3.3 分流表），`game.yaml` 写 `module: '//harmony-only'` 明示**。
 
 ### 3.2b 搜不到数时的兜底路线（按顺序试）
 
@@ -120,7 +127,7 @@
 2. **无可见数值埋不了断点**（timer/结算类）：Ultimap/CodeFilter 记分支，以“门事件发生/未发生”两次过滤收敛热点；或 break-and-trace + 栈回溯，对比正常 vs 修改后执行流。已可一键执行：`ce lbr op=start`→做动作→`op=read`看分支对（往前找调用），`ce step thread=<id> count=80`逐条看`[CRYPTO?]`（往后找解密），完事`ce dbgdetach`。
 3. **写指令被多对象复用**：看“这段代码访问了哪些地址”，用不同对象地址区分玩家/敌人/共享逻辑，顺藤找结构体基址；敌我字段用 dissect data 分组对比（组内同、组间异列即阵营字段）。
 4. **命中点是通用函数**：dissect code 画调用/引用图，门判断常是其上游唯一 jcc，向上找调用方分流。
-5. **Unity Mono**：Mono dissect 直接浏览托管类/方法并强制 JIT 出 native 地址，再转 AOB（跳过盲搜）。
+5. **Unity Mono（仅开发期定位）**：Mono dissect 直接浏览托管类/方法并强制 JIT 出 native 地址，跳过盲搜；成品不落 AOB，转 Harmony（§3.3）。
 6. **版本漂移保命**：AA 一律用注入模板（Template→Code/Full injection，64 位远跳按 Ctrl 生成）；`assert` 校验补丁前缀、`readMem` 快照原字节；CE 侧开 speedhack 降速冻结计时类逻辑争取扫描反应时间。
 
 ### 3.3 成品内存层（去 CE 化，单 exe 的关键）
@@ -132,17 +139,24 @@
 - **代码洞（cave）成品约定**：`overwrite_len>=5`（放得下 E9），原地 `E9->洞` + nop 垫平；洞布局为 `[洞逻辑][E9跳回原址+overwrite_len][数据区]`，申请一次、释放一次（`VirtualAllocEx`/`VirtualFreeEx`，内存自带清零）；洞内分支（jne/je）组装时一次算好相对偏移，只出一个尾出口，不中途跳回；CE 里 `alloc(name,$8)+registersymbol` 的外部变量对应 `data_size` 声明 + 洞内 `0xAAAAAAAAAAAAAAAA` 占位回填（倍数/指针写数据区）。
 - **组装链**：CE 调通的汇编经 keystone 出 hex、capstone 反汇编复核（栈平衡、标志位、分支落点）后再入库；不要手算偏移。
 - **一致性校验**：入库前核对 ENABLE 的 label、DISABLE 回填字节、AOB 三者指向同一位置（label 复制错位是常见坏补丁源）。
-- Unity IL2CPP 游戏内存层同样适用本节，模块名换成 `GameAssembly.dll` 即可；Lua 桥部分仅 UE4SS 有效，Unity 游戏只用内存层 + Mono 桥（另议）。
+- Unity 分流（与 UE 互不影响，`game.yaml` 用 `engine/bridge/module` 声明）：
+  | 构型 | 内存补丁 | 逻辑层 | game.yaml |
+  |---|---|---|---|
+  | UE | 主模块 AOB（本节） | UE4SS Lua 桥（`bridge: ue4ss`） | `engine: ue` |
+  | Unity IL2CPP | `GameAssembly.dll` 上 AOB（本节同样适用） | 内存层；Lua 桥无效 | `engine: unity-il2cpp`, `module: GameAssembly.dll` |
+  | Unity Mono | **不走 AOB**（JIT 地址每次变，`pattern_scan_module` 扫不到稳定地址） | BepInEx 内挂直接调官方 API + Harmony（检查放行/扣除抑制），与物品同一套插件 | `engine: unity-mono`, `bridge: none`, `module: '//harmony-only'` |
+  判据：`MonoBleedingEdge/` + `Managed/*.dll` 明文即 Mono；`GameAssembly.dll` + `global-metadata.dat` 即 IL2CPP（详见 BepInEx 技能构型判定）。
 
 ---
 
 ## 4. 一体机 UI 约定（单窗口、开关式、关闭即恢复）
 
-1. 顶部：游戏根目录 + 部署按钮 + 游戏/Mod 状态自检。
-2. Tab 按系统分（物品/常用包/弟子/建筑/拍卖…），数值页遵循读基线→输期望→算差值→写→重读。
-3. 危险操作（全量发放、删特性、升级建筑）先确认框；不可逆标注清楚。
-4. 日志框只收 `[LVT]` 提纯行 + 内存层 `OK/失败` 行；超时明确写“去游戏内/日志确认”，不谎报成功。
-5. 新功能只增按钮和方法，不改无关页；中文名缺口（FText 无表）先标“待拆包”，不硬编。
+1. 顶部：游戏根目录 + 一键部署 + 游戏/Mod/进程三行状态自检。目录自动定位：注册表 Steam 路径 → `libraryfolders.vdf` 枚举各库 → `appmanifest_<id>.acf` 读安装目录 → 校验 exe 存在（exe 嵌在子目录时向下找）；找不到转手动选择 + ini 记忆。
+2. 一键部署只补缺项：注入本体缺啥补啥，已有不碰，不动存档和别人的插件；自家文件缺失或版本不一致（大小/哈希比对）才覆盖。部署前查进程（`tasklist` 对 exe 名），运行中禁止覆盖并提示完全退出。部署完提示重启一次游戏。（模板实现：`engine/deploy.py` + `tools/steam_find.py`，见 `ui/app.py` 接线。）
+3. Tab 按系统分（物品/常用包/弟子/建筑/拍卖…），数值页遵循读基线→输期望→算差值→写→重读。
+4. 危险操作（全量发放、删特性、升级建筑）先确认框；不可逆标注清楚。
+5. 日志框只收 `[LVT]` 提纯行 + 内存层 `OK/失败` 行；超时明确写“去游戏内/日志确认”，不谎报成功。
+6. 新功能只增按钮和方法，不改无关页；中文名缺口（FText 无表）先标“待拆包”，不硬编。
 
 ---
 
