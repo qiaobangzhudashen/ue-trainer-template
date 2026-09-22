@@ -20,7 +20,7 @@
 ## 1. 新游戏开工主流程
 
 1. **静态侦察**：找游戏 EXE、`Content/Paks/*.pak`、`Engine/` 目录；引擎版本从崩溃报告（`Saved/Crashes/CrashContext.runtime-xml`，`++UE5+Release-x.y`）或 EXE 内版本串确认。
-2. **装 UE4SS**：版本必须覆盖目标引擎（老版扫不出 GUObjectArray 就换 experimental 新构建）；`EngineVersionOverride` 留空自动识别；**关闭自动热重载**，只用手动 Ctrl+R（自动重载已实锤导致崩溃）。
+2. **装 UE4SS**：版本必须覆盖目标引擎（老版扫不出 GUObjectArray 就换 experimental 新构建）；`EngineVersionOverride` 留空自动识别；**关闭自动热重载**，只用手动 Ctrl+R（自动重载已实锤导致崩溃）；但部署/补齐时必须把 `EnableHotReloadSystem` 置 `1`（自带包默认 `0`，此时 Ctrl+R 全局无反应）。
 3. **确认启动**：Steam 是否必须运行、启动后注入是否成功（示例：`dwmapi.dll` 代理）、`ue4ss/UE4SS.log` 有无报错。
 4. **确认输入**：游戏内控制台开启方式（示例：`~`/F10）、Ctrl+R 重载、热键位；输出双通道（控制台回显 + `UE4SS.log`）。
 5. **全对象导出**：拿 `UE4SS_ObjectDump.txt`，之后一切逆向都从搜它开始。
@@ -32,12 +32,15 @@
 
 ### 1.1 双通道就绪检查（UE 必须 UE4SS+内存两条都通）
 
-- Lua 通道：脚本部署后游戏内 Ctrl+R，看到 `loaded` 回显；hook 类以日志成功行为准（如免费开关的两行 ids），重载/重启后重开。
+- Lua 通道：脚本部署后游戏内 Ctrl+R，看到 `loaded` 回显（控制台 + `UE4SS.log` 各一行）；hook 类以日志成功行为准（如免费开关的两行 ids），重载/重启后重开。**本局启动时 Mod 未注册则本局注定无通道，Ctrl+R 救不回，必须重启游戏**（见 1.2 顺序铁律）。
 - 内存通道：CE 桥脚本放 `autorun` 自启（或确认管道能 ping 通）；直连游戏进程确认 PID；抽查已有 AOB 是否仍唯一（1 分钟，版本漂移第一发现人）。
 - 开关归属：同一批字节，UI 和 CE 表**二选一**操作，反向互顶必出灵异问题。
 
 ### 1.2 部署与热重载纪律
-- Mod 目录 `ue4ss/Mods/<Name>/Scripts/*.lua` + `mods.txt` 加 `<Name> : 1`；改完脚本部署后游戏内 **Ctrl+R 一次**，看到 `loaded` 回显才算数。
+- 双注册（experimental 3.x 真认的是 `Mods/mods.json`，`mods.txt` 只是 load order）：两边都要有 `<Name>`，缺一边即静默跳过——日志表现为到 `Keybinds` 就 `Event loop start`，无报错、无 `loaded`、无 `Error loading`。`mods.txt` 必须干净无空行无注释行；每次解包/更新 UE4SS 后重验两边。
+- 改完脚本部署后游戏内 **Ctrl+R 一次**，看到 `loaded` 回显才算数；按之前先关游戏内控制台、游戏窗口聚焦，否则按键被输入框吃掉。
+- **顺序铁律：先开修改器（补本体 + 双注册 + Scripts），再开游戏。** 启动瞬间注册表就必须就位；新用户/Steam 更新后首次必须走这个顺序。
+- 修改器启动自动体检三件套（缺一不可，进 `engine/deploy.py` 复用）：①校验注入本体（代理 dll + `ue4ss/` 目录，缺即用自带 zip 补，zip 打进 exe，只补缺项）②双注册修复 + `EnableHotReloadSystem=1` ③发通道探针（如下发 `lv_help` 等 `exec done`，超时判死）。补完本体必须提示**重启一次游戏**，不要在本局继续测。
 - **hook 是纯内存的**：重载/重启即失效，用前重开（如免费开关），以日志回显为准，不要凭记忆。
 - 外部 UI 下发命令走桥接文件：写 `.tmp` 再整体替换成 `cmd.txt`（防读半截），游戏内 `LoopAsync` 轮询执行，结果只回 `UE4SS.log`（`[LVT]` 前缀），执行后文件清空。
 - `启动修改器UI.bat` 必须纯 ASCII（中文路径/命令会碎）。

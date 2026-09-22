@@ -200,7 +200,15 @@ Copy-Item bin\Release\<mod>.dll "<GameRoot>\BepInEx\plugins\" -Force
 
 部署前确认游戏已关闭、目标目录正确；部署后检查 DLL 时间戳和 BepInEx 日志。建议为每个游戏保留上一稳定版本并提供回滚步骤。
 
-### 4.3 反编译与运行时分析
+### 4.3 修改器启动自动体检（与 UE 三件套同构）
+
+打开修改器/启动器即自动做，不等人点（逻辑进共享 `deploy.py`，见 UE 侧 `engine/deploy.py` 同构实现）：
+
+- 三件套校验：劫持链（按分支：doorstop 的 `winhttp.dll`/`version.dll` 或对应配置）+ `BepInEx/` 本体目录 + `BepInEx/plugins/<mod>.dll`；缺即用自带包补齐（打进 exe），只补缺失项，不动用户其他插件。
+- 本局生效：游戏启动瞬间文件必须就位；启动时缺文件则本局无通道，补完必须重启一次游戏，不要在本局继续测。
+- 部署纪律：游戏关闭时复制自家 DLL；部署后核时间戳 + 日志无 Error；补齐 chainloader 类文件后重验分支匹配（Mono/IL2CPP 不混用）。
+
+### 4.4 反编译与运行时分析
 
 | 工具 | 用途 |
 |---|---|
@@ -213,7 +221,7 @@ Copy-Item bin\Release\<mod>.dll "<GameRoot>\BepInEx\plugins\" -Force
 
 静态反编译结果是候选，不是运行时事实。IL2CPP 的字段偏移、裁剪和生成类型尤其需要结合版本和运行时日志确认；遇到裁剪导致的方法不可用时，再研究合适的兼容调用或 P/Invoke 兜底，不要默认绕过所有 API。
 
-### 4.4 运行时探针
+### 4.5 运行时探针
 
 最小探针只记录必要事实：
 
