@@ -1,10 +1,10 @@
 # 新机器开工 SETUP（一次配好，以后只报游戏目录+需求）
 
 > 以后新机器，你只需要告诉 AI 四样东西，剩下的按本文走：
-> 1. 本仓库地址（技能+模板）：`https://github.com/qiaobangzhudashen/ue-trainer-template`
+> 1. 本仓库地址（技能+模板）：`https://github.com/qiaobangzhudashen/ue-trainer-template`，固定clone到 `D:/github-ue`（技能注册路径即此，新旧电脑一致）
 > 2. CE 安装目录（Bridge Lua 放 autorun 自启用）
 > 3. 游戏根目录（装游戏的那台机器上的路径）
-> 4. 一句话需求（如“建筑免材料”）+ 口令“UE修改器”（Unity 游戏换成“BepInEx”）
+> 4. 一句话需求（如“建筑免材料”）+ 口令“通用修改器”（Unity 内挂路线同属该技能，引擎由 AI 按目录判定分流）
 
 ## 1. 装前置（Windows 10/11，64 位 Python 对 64 位游戏）
 
@@ -19,7 +19,7 @@ pip install pymem pyinstaller pyyaml pywin32 pillow capstone
 ## 2. 拉两个仓库
 
 ```powershell
-git clone https://github.com/qiaobangzhudashen/ue-trainer-template.git D:/skills
+git clone https://github.com/qiaobangzhudashen/ue-trainer-template.git D:/github-ue
 git clone https://github.com/miscusi-peek/cheatengine-mcp-bridge.git D:/opencode/ce-bridge
 ```
 
@@ -35,30 +35,30 @@ git clone https://github.com/miscusi-peek/cheatengine-mcp-bridge.git D:/opencode
 ## 4. 挂载技能（二选一）
 
 ```json
-// opencode.json
+// opencode.json（新旧电脑统一注册到本仓库位置）
 { "$schema": "https://opencode.ai/config.json",
-  "skills": { "paths": ["D:/skills"] } }
+  "skills": { "paths": ["D:/github-ue"] } }
 ```
 
-或把 `D:/skills/ue-trainer/`、`D:/skills/bepinex/` 拷到 `~/.config/opencode/skills/` 下。
+或把 `D:/github-ue/generic-trainer/`、`D:/github-ue/bepinex/` 拷到 `~/.config/opencode/skills/` 下。
 
 ## 5. 冒烟检查（AI 开工前自己跑）
 
 ```powershell
-cd D:/skills
+cd D:/github-ue
 python -m toolbox info            # 看 pe/shot/ocr/db/ce 哪些可用
 python -m toolbox ce action=ping  # CE 在线应返回 success；不通则按提示自查第 3 步
 ```
 
 `toolbox` 用法：`import toolbox; toolbox.run("ce", action="scan", value="15000")`，
-完整清单看 `toolbox/README.md`。注意默认路径都是本说明的 `D:/` 盘符，
-换盘符/换目录时开工告诉 AI 覆盖即可（UE 技能“本机路径”条、模板位置即本仓库位置）。
+完整清单看 `toolbox/README.md`。注意默认路径都是本说明的 `D:/github-ue`，
+换盘符/换目录时开工告诉 AI 覆盖即可（通用修改器技能“本机路径”条、模板位置即本仓库位置）。
 
 ## 6. 开工口令
 
-- UE 游戏：报**游戏根目录** + **一句话需求** + 说“**UE修改器**”。
+- 通用口令：报**游戏根目录** + **一句话需求** + 说“**通用修改器**”。
+  AI 先扫目录判引擎：UE 走 UE4SS+CE 路线，Unity-Mono 转 BepInEx 路线，IL2CPP 六问后再定。
   新游戏的 `MOD-MEMORY.md` 由 AI 新建，你不用准备。
-- Unity 游戏：同上，口令换“**BepInEx**”（不需要 CE，前置只装 dotnet + BepInEx 对应分支）。
 
 之后流程（AI 按技能执行）：静态侦察 → 官方链/Hook → CE 搜断反补丁 → 截图验证 →
 填 `ue-trainer-template/games/<新游戏>/game.yaml` → 联调 → `tools/build.py` 打单 exe。

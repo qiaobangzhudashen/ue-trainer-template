@@ -1,6 +1,6 @@
 ---
 name: bepinex
-description: Unity BepInEx MOD 开发. Use when user mentions BepInEx, Unity MOD, IL2CPP/Mono 插件, Harmony 补丁, 读改写物品属性, 或 Unity 游戏新功能开工. Covers 构型判定, 目标系统六问, 读改写实现规范, IMGUI 窗口约定. Use ONLY for Unity BepInEx mod work, not UE trainer work (那是 ue-trainer).
+description: Unity BepInEx MOD 开发. Use when user mentions BepInEx, Unity MOD, IL2CPP/Mono 插件, Harmony 补丁, 读改写物品属性, 或 Unity 游戏新功能开工. Covers 构型判定, 目标系统六问, 读改写实现规范, IMGUI 窗口约定. Use ONLY for Unity BepInEx mod work, not trainer work (那是 generic-trainer 通用修改器).
 ---
 
 # BepInEx
@@ -19,7 +19,7 @@ Unity 游戏 BepInEx 插件式 MOD 开发：游戏内 DLL，走官方 API 读改
 
 ## 工具（toolbox 包，只读侦察）
 
-`D:/skills/toolbox/`：`run("pe", action="exports", path=...)` 看程序集导出；
+`D:/github-ue/toolbox/`：`run("pe", action="exports", path=...)` 看程序集导出；
 `run("shot_ocr", window=...)` 看游戏内 UI；`run("db", ...)` 查表；
 `run("info")` 查环境。`click/key` 仅输入验证用，`ce` 的写内存仅 UE 路线用——
 BepInEx 路线写入一律走游戏内插件，不走本包。

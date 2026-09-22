@@ -29,7 +29,7 @@ toolbox.run("ce", action="ping")
 toolbox.run("info")
 ```
 
-CLI：`python -m toolbox <工具> <参数=值> ...`（要在 `D:\skills` 下执行）。
+CLI：`python -m toolbox <工具> <参数=值> ...`（要在 `D:\github-ue` 下执行）。
 
 结构化取值（绕开 20000 字截断）：直接调子模块函数，
 如 `from toolbox.pe import pe_get_exports_detail`。
