@@ -4,7 +4,7 @@
 # UE 与 Unity 共用本模板,互不影响: 缺 engine/bridge 字段即按 UE 旧行为回退.
 
 game: _TEMPLATE
-exe: Game-Win64-Shipping.exe
+exe: YOURGAME-Win64-Shipping.exe
 # version: 1.0.0  # 游戏版本,AOB 失效时先对版本(按 AOB 三律重走搜断反补丁)
 
 # ---- 引擎分流 (UE/Unity 通用,以后直接套用) ----
@@ -22,13 +22,13 @@ module: ''
 steam_app_id: ''
 game_dirname: ''
 # Mod 在游戏目录下的相对路径 (UE4SS Mod 目录; Unity 内挂时留空)
-mod_rel: Game/Binaries/Win64/ue4ss/Mods/GameTrainer
+mod_rel: ''  # 按游戏填写（UE 例：Game/Binaries/Win64/ue4ss/Mods/GameTrainer）
 # Unity BepInEx 专用 (UE 留空): 插件文件名 + 日志相对路径 + 回显 tag
 plugin_dll: ''
 log_rel: ''
-tag: '[LVT]'
+tag: ''  # 按游戏填写，如 '[LVT]'
 # 官方发奖函数 (Lua 侧用,物品添加走这条,不走内存; Unity 内挂不走此链)
-give_func: BirdLetterSystem:AwardSomeItems
+give_func: ''  # 按游戏填写，如 'BirdLetterSystem:AwardSomeItems'
 
 patches:
   # 例1: 简单原地补丁 (nop 掉扣除)

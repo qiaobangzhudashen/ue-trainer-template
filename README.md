@@ -2,7 +2,7 @@
 
 单机游戏实时修改器：通用方法论（SKILL）+ 可直接填空的源码模板。UE/Unity 通用，开工先判引擎。
 
-## 三个目录
+## 四个目录
 
 | 目录 | 是什么 | 先看哪个 |
 |---|---|---|
@@ -23,7 +23,7 @@
   "skills": { "paths": ["<本仓库绝对路径>"] } }
 ```
 
-或把 `generic-trainer/`、`bepinex/` 拷到 `~/.config/opencode/skills/` 下。之后说一句"通用修改器"或"BepInEx"即自动加载。
+或把 `generic-trainer/`、`bepinex/` 拷到 `~/.config/opencode/skills/` 下。之后说一句"通用修改器"即自动加载（Unity 内挂路线同属该技能，引擎由 AI 判定分流）。
 
 ## 本机路径说明
 

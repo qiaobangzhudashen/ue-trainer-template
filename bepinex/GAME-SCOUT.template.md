@@ -65,7 +65,8 @@
 ## 4. 生命周期与就绪条件
 
 - 插件 `Awake` 证据：
-- 驱动入口：`[ ] 游戏常驻 Update  [ ] OnGUI  [ ] Harmony Patch  [ ] 其他`
+- 驱动入口（宿主方法）：`[ ] 游戏常驻 Update  [ ] OnGUI  [ ] 其他`
+- 接入机制：`[ ] AddComponent  [ ] Harmony Patch  [ ] 其他`
 - 常驻宿主类 / 方法：
 - 是否清理外部 `MonoBehaviour`：`[ ] 否  [ ] 是  [?] 未验证`
 - `Update` 是否执行：

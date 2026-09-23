@@ -1,8 +1,9 @@
-# UE 通用修改器源码模板
+# 通用修改器源码模板（UE/Unity）
 
 > 给 agent 看的源码,不是给玩家的手填表.新游戏流程固定:
 > 你报游戏根目录 + 需求,我负责 CE 里搜断反补丁 + Lua 里定位官方发奖链,
 > 填进 `games/<slug>/game.yaml`,调通后再 `tools/build.py` 打成单 exe.
+> Unity-Mono 转 BepInEx 内挂不走 AOB（打包 Setup 安装器），分流见 `games/_template/game.yaml` 的 engine/bridge/module 字段.
 
 ## 目录
 

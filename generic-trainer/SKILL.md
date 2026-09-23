@@ -1,6 +1,6 @@
 ---
 name: generic-trainer
-description: 通用单机游戏修改器开发（UE/Unity 通用，先判引擎再选路线）. Use when user mentions 通用修改器, 游戏修改器, UE4SS, BepInEx, CE 内存补丁, AOB, 免材料升级, 物品添加, code cave, GameAssembly, 单窗口开关式修改器, 或新游戏开工. Covers 开工引擎判定路由，UE4SS Lua 逻辑层 + CE/AOB native 补丁 + BepInEx 内挂 + PyInstaller 单 exe 一体机. Use ONLY for game-trainer work.
+description: 通用单机游戏修改器开发（UE/Unity 通用，先判引擎再选路线）. Use when user mentions 通用修改器, 游戏修改器, UE4SS, CE 内存补丁, AOB, 免材料升级, 物品添加, code cave, GameAssembly, 单窗口开关式修改器, 或新游戏开工. Covers 开工引擎判定路由，UE4SS Lua 逻辑层 + CE/AOB native 补丁 + Unity 引擎判定分流 + PyInstaller 单 exe 一体机. Use ONLY for game-trainer work.
 ---
 
 # 通用修改器

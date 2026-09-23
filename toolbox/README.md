@@ -8,11 +8,12 @@
 ```
 toolbox/
   __init__.py    统一入口 run()/CLI(延迟加载各模块)
+  __main__.py      CLI 入口（python -m toolbox）
   pe.py          PE 分析(导出/导入/依赖/反汇编/vtable/扫描/字符串)
   shot.py        窗口/屏幕截图 + shot_ocr
   ocr.py         图片 OCR(PaddleOCR 2.x/3.x)
-  gui.py         click/key(验证点击用)
-  describe.py    图片色块描述
+  gui.py         click/key 调用（验证点击用）
+  describe.py    图片色块描述（image_describe）
   db.py          JSON→SQLite+FTS5(查 dump 表)
   ce.py          CE 桥接(搜/断/反/读写,走命名管道,不点 CE 界面)
   info.py        环境能力探测

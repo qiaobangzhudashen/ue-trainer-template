@@ -46,7 +46,7 @@ def main():
     open(os.path.join(dst, 'items.txt'), 'w', encoding='utf-8').write(
         '# ID\t名称\t分类 (agent 填目标游戏 ID 库)\n')
     open(os.path.join(dst, 'MOD-MEMORY.md'), 'w', encoding='utf-8').write(
-        '# %s MOD-MEMORY\n\n## 环境\n- exe: %s\n- engine: %s\n\n## 六问\n(UE 按 ue-MODS.md, Unity 按 unity-MODS.md 填写)\n'
+        '# %s MOD-MEMORY\n\n## 环境\n- exe: %s\n- engine: %s\n\n## 六问\n(UE 按 generic-MODS.md, Unity 按 unity-MODS.md 填写)\n'
         % (a.slug, a.exe, a.engine))
     print('已生成 %s (engine=%s), 下一步 agent 按六问填空.' % (dst, a.engine))
 

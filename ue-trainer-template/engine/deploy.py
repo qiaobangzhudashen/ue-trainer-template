@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """注入体检三件套（UE4SS / BepInEx 同构，见 skill 方法论文档）。
 
-UE 侧对应 ue-MODS.md §1.2，Unity BepInEx 侧对应 unity-MODS.md §4.3。
+UE 侧对应 generic-MODS.md §1.2，Unity BepInEx 侧对应 unity-MODS.md §4.3。
 只用标准库；各游戏 trainer 从这里 import，不要每家各写一份。
 
 实锤来源：LostVillage 新用户模拟——experimental 3.x 真认 mods.json、

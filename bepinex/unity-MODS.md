@@ -82,7 +82,7 @@
 |---|---|---|
 | 物品/装备 | 原型表、品质、子类型、叠加上限、词条结构 | 打造、掉落、宝箱 |
 | 货币/属性/点数 | 独立数值类或统一属性枚举、完整清单 | GM/调试窗口、奖励结算 |
-| 技能/武功 | 技能表、等级/品阶、套路和前置 | 学习、升级技能流程 |
+| 技能 | 技能表、等级/品阶、分支和前置 | 学习、升级流程 |
 | 任务 | 任务表、状态机、接取前置 | 接任务、交任务流程 |
 | 存档/进度 | 序列化结构、版本和加密方式 | 存档、读档、自动存档 |
 | 战斗/数值 | 属性枚举、Buff、结算点 | 装备加成、被动、Buff 流程 |
@@ -194,8 +194,8 @@ void ApplyValues()
 ### 4.2 部署与构建
 
 ```powershell
-dotnet build <mod>.csproj -c Release
-Copy-Item bin\Release\<mod>.dll "<GameRoot>\BepInEx\plugins\" -Force
+dotnet build MyMod.csproj -c Release
+Copy-Item bin\Release\MyMod.dll "<GameRoot>\BepInEx\plugins\" -Force
 ```
 
 部署前确认游戏已关闭、目标目录正确；部署后检查 DLL 时间戳和 BepInEx 日志。建议为每个游戏保留上一稳定版本并提供回滚步骤。
@@ -208,7 +208,30 @@ Copy-Item bin\Release\<mod>.dll "<GameRoot>\BepInEx\plugins\" -Force
 - 本局生效：游戏启动瞬间文件必须就位；启动时缺文件则本局无通道，补完必须重启一次游戏，不要在本局继续测。
 - 部署纪律：游戏关闭时复制自家 DLL；部署后核时间戳 + 日志无 Error；补齐 chainloader 类文件后重验分支匹配（Mono/IL2CPP 不混用）。
 
-### 4.4 反编译与运行时分析
+### 4.4 成品安装器（新用户单文件版，Unity 成品默认按此做）
+
+标准形态：PyInstaller 单文件 `<Game>Setup.exe`（tkinter 界面，`--onefile --windowed`），`payload/` 内嵌 `bepinex.zip` + 自家 MOD DLL，打包脚本三步固定：①`dotnet build` 出最新 DLL ②从金色来源收 payload 打 zip ③PyInstaller 出单文件。实例见各游戏工程的 `Launcher/`（Mono）/`Setup/`（IL2CPP）目录。
+
+安装器必备件（缺一不可）：
+
+- Steam 自动定位：注册表 Steam 路径 → `libraryfolders.vdf` 各库 → `appmanifest_<id>.acf` 的 `installdir` → exe 存在校验；找不到转手动选择 + ini 记忆。
+- 三行状态：目录有效性 / BepInEx+MOD 版本状态（自家 DLL 按大小比对判旧）/ 游戏进程（运行中禁用部署和清除）。
+- 一键部署：只补缺失项，不动存档、别人的插件和已有的配置；每次新增记入清单 `BepInEx/<Mod>.files.txt`；部署完提示重启一次游戏（本局不生效）。
+- 清除按钮：二次确认后按清单删除本次新增 + 自家残留配置，空目录自下而上回收，恢复到部署前；部署前就存在的文件一个不碰。逻辑必须先在假游戏目录实测（部署数 == 清除数，别人文件原样）。
+- Steam 调起按钮（`steam://rungameid/<id>`）和说明文案（见下）。
+
+payload 分流（只补缺项的前提下，按构型多收）：
+
+| 构型 | 必收 | 多收 |
+|---|---|---|
+| Mono（BepInEx 5） | 劫持链（`winhttp.dll`/`version.dll` + doorstop 配置）+ `BepInEx/core` + `BepInEx/patchers` | 无 |
+| IL2CPP（BepInEx 6） | 同左 | `BepInEx/interop` + `BepInEx/unity-libs` + `BepInEx/config/BepInEx.cfg`（控制台关，键位以目标分支实物为准）+ `dotnet/`（BepInEx6 运行时，原版游戏没有） |
+
+成品静默（两处，缺一即扰民）：`BepInEx.cfg` 的 `[Logging.Console] Enabled = false`（打包脚本对配置文本强制改写，不依赖人工；分支键位差异以实物为准）；插件自带 `调试/详细日志` 配置默认关闭，轮询/事件/转储类诊断走开关，错误和关键状态常开。调试时分别改回 true。
+
+说明文案规范：**部署成功后不需要再打开安装器，游戏运行自动加载，打开修改器按快捷键**。注意用词：快捷键随时开窗，读档只是功能的前置条件（窗内未就绪提示），不要写成"读档按 F8"。
+
+### 4.5 反编译与运行时分析
 
 | 工具 | 用途 |
 |---|---|
@@ -221,7 +244,7 @@ Copy-Item bin\Release\<mod>.dll "<GameRoot>\BepInEx\plugins\" -Force
 
 静态反编译结果是候选，不是运行时事实。IL2CPP 的字段偏移、裁剪和生成类型尤其需要结合版本和运行时日志确认；遇到裁剪导致的方法不可用时，再研究合适的兼容调用或 P/Invoke 兜底，不要默认绕过所有 API。
 
-### 4.5 运行时探针
+### 4.6 运行时探针
 
 最小探针只记录必要事实：
 
@@ -272,8 +295,9 @@ Patch 前确认目标方法唯一性、参数签名、调用频率和对象生�
 
 - 快捷键只能由一个来源负责切换状态；不要同时在 `Update` 和 `OnGUI` 对同一个按键 toggle。
 - 优先使用已经验证可用的输入后端；业务逻辑不直接绑定某个输入库。
-- 若 Unity/IMGUI 鼠标事件实测不可用，再使用平台相关的鼠标状态读取作为兜底；不要因 IL2CPP 就默认 P/Invoke。
-- 不要预设 `Camera.onGUI` 或其他静态 GUI 入口存在；先检查目标 Unity 程序集和运行时行为。
+- IMGUI 鼠标事件是否可用，必须以事件计数采样为准：在 `OnGUI` 内按 `Event.type` 计数 `MouseDown/MouseUp/MouseMove`，几十次主动点击零命中即判定不通。不要凭"悬停变色/按下闪一下"猜——渲染走通不代表事件走通（曾实测只有 `Layout/Repaint`，点击全部穿透到游戏）。
+- 事件不通时，交互优先改走 `Update` 轮询：绘制只负责显示 + 登记控件矩形；点击用 `Input.GetMouseButtonDown/Up` + `Input.mousePosition` 做"按下/抬起在同一控件才触发"，坐标换算为 `guiPos = (mouse.x, Screen.height - mouse.y)`，再按目标分辨率/DPI 实测校准；拖拽同理，打字用 `Input.inputString` 轮询（含退格/回车/粘贴，中文 IME 需实测，过滤类输入准备 ID 数字通道）。P/Invoke 读屏幕坐标做命中曾因 DPI 错位 + 与 `GUI.Button`/`GUI.DragWindow` 双轨互顶实锤失败，选用前必须先实测验证，不做默认兜底。
+- 不要预设 `MonoBehaviour.OnGUI` 之外的静态 GUI 入口存在；先检查目标 Unity 程序集和运行时行为。
 
 ### 5.3 IMGUI 窗口约定
 
@@ -286,6 +310,7 @@ Patch 前确认目标方法唯一性、参数签名、调用频率和对象生�
 ```csharp
 private static readonly Color WindowColor = new Color(0.10f, 0.11f, 0.12f, 1f);
 
+// 伪代码：windowWidth/windowHeight/titleHeight 为自家窗口宽/高/标题高，按目标分辨率实测填写。
 private void DrawWindow(int id)
 {
     var oldColor = GUI.color;
@@ -304,7 +329,7 @@ private void DrawWindow(int id)
 3. 中文字体应使用目标系统可用字体，并统一设置 Label 样式；字体设置和颜色问题以实际游戏渲染结果为准。
 4. **字体放大只改窗口内**：在窗口回调入口暂存 `GUI.skin` 的 label/button/textField/toggle 字号，设大后绘制，`try/finally` 恢复，不污染游戏自带 UI；OS 字体按可用列表创建一次并缓存。字号按目标分辨率实测确定。
 5. **放大后防溢出**：过滤栏拆行（类型独占一行，选项类放第二行），列表行高/步进与字号同步加大，输入框同步加宽；验收标准是最大字号下无控件挤出窗口。
-6. **档位走输入框，不走按钮**：品质/等阶这类枚举档位用手动输入框 + 合法范围钳制，越界/非法按默认值处理并提示；会产生坏数据的越界档位不给快捷按钮。批量快捷按钮（如 +999/添加 100 类）一律删除，数量走手动输入框。
+6. **档位走输入框，不走按钮**：品质/等阶这类枚举档位用手动输入框 + 合法范围钳制，越界/非法按默认值处理并提示；会产生坏数据的越界档位不给快捷按钮。批量快捷按钮（如 +999/添加 100 类）默认不给，数量走手动输入框；确需快捷先实测坏数据边界。
 
 ---
 
@@ -314,7 +339,7 @@ private void DrawWindow(int id)
 - **故障隔离**：在插件入口、Harmony 回调、输入回调和 UI 回调设置边界异常处理；业务逻辑使用精确 `catch`，记录完整上下文，避免空 `catch` 吞错。
 - **无全局污染**：不修改游戏原有数据结构；缓存使用副本，写入走官方 API。
 - **前置检查**：调用前检查管理器、玩家、背包、数据表和场景是否就绪；未就绪时等待、重试或给出可诊断日志。
-- **日志**：统一 `[TAG]` 前缀，按需使用 `[DIAG]`、`[EV]`、`[CLK]`；`Awake` 输出加载、版本和绑定键，作为插件生效的第一证据。
+- **日志**：统一 `[TAG]` 前缀（`[DIAG]`/`[EV]` 等按需扩展）；`Awake` 输出加载、版本和绑定键，作为插件生效的第一证据。
 
 ---
 
@@ -343,7 +368,7 @@ private void DrawWindow(int id)
 | 按键无反应 | 输入后端不匹配、游戏占用、多个来源抵消 | 查实际输入 DLL/调用链；单独验证输入后端；换无冲突键；显隐 toggle 只保留一个来源 |
 | 数据改了但 UI 不变 | UI 刷新事件缺失、缓存未重算、对象被 UI 过滤 | 重新读取确认数据；查官方刷新事件/重算方法；检查过滤条件和场景时机 |
 | 物品存在但不可见/不可用 | 子类型、前置、叠加性、生成字段或 UI 过滤错误 | 对照官方掉落/打造调用链；补齐合法子类型和生成字段；调用已验证的刷新机制 |
-| 装备无附加属性 | 只传品质，未复现词条组/词条数量规则 | 追踪官方打造或掉落系统，确认品质到词条组和数量的映射，再写入并重新读取 |
+| 装备无附加属性 | 只传 ID/品质，未复现官方生成规则 | 追踪官方打造或掉落调用链，确认生成规则（如词缀组/数量映射）后再写入并重新读取 |
 | 数值重复叠加 | 把绝对值传给增量 API，或没有保存基准值 | 读取时保存 `baseline`；确认时使用 `desired - baseline`；写后再次读取并更新基准值 |
 | `DllNotFoundException` | HintPath、运行时 DLL 或平台位数不匹配 | 检查 csproj 引用、目标目录和 x86/x64；用当前游戏实际 DLL，不要复制旧项目路径 |
 | `TypeLoadException` | BepInEx、interop、插件引用版本混用 | 核对当前游戏 BepInEx 分支、interop 生成版本和插件基类；清理旧引用后重建 |
@@ -369,7 +394,7 @@ private void DrawWindow(int id)
 6. **进度**：功能清单、当前状态、已知问题、下一步。
 7. **部署与回滚**：DLL 路径、构建/复制命令、稳定版本备份、回滚步骤和验证结果。
 
-判断规则：**删掉游戏名称后仍对大多数 Unity MOD 成立，就放本文档；必须填具体名称、数值、签名、路径或已验证行为，就放 `MOD-MEMORY.md`。**
+判断规则见 §0。
 
 ---
 

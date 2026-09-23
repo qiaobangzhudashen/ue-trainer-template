@@ -23,10 +23,10 @@
    | 看到 | 判定 | 路线 |
    |---|---|---|
    | `Engine/` 目录（`Content/Paks/*.pak` 常嵌在内层游戏目录下） | Likely UE | 走本流程（UE4SS + CE/AOB，打包 Trainer） |
-   | `*_Data/` + `UnityPlayer.dll` + `Managed/*.dll` | Likely Unity-Mono | 转 bepinex 技能（BepInEx + Harmony，不走 AOB，打包 Setup 安装器） |
-   | `GameAssembly.dll` + `global-metadata.dat` | Likely Unity-IL2CPP | 两边文档都读，六问后再定 |
+   | `*_Data/` + `Managed/*.dll`（且无 `GameAssembly.dll`） | Likely Unity-Mono | 转 bepinex 技能（BepInEx + Harmony，不走 AOB，打包 Setup 安装器） |
+   | `GameAssembly.dll` + `global-metadata.dat`（IL2CPP 行优先于 Mono 行判定） | Likely Unity-IL2CPP | 内存层走 `GameAssembly.dll` 上 AOB；逻辑层是否走内挂按六问结论，不套默认 |
    判定只看目录证据（`BepInEx/`、`ue4ss/` 只能证明已改装，不能证明引擎）；冲突或都无即停下问用户。结果填 `game.yaml: engine` + `MOD-MEMORY.md` 环境，后续 bridge/module/打包全部跟它走。UE 版本从崩溃报告（`Saved/Crashes/CrashContext.runtime-xml`，`++UE5+Release-x.y`）或 EXE 内版本串确认。
-2. **装 UE4SS**：版本必须覆盖目标引擎（老版扫不出 GUObjectArray 就换 experimental 新构建）；`EngineVersionOverride` 留空自动识别；**关闭自动热重载**，只用手动 Ctrl+R（自动重载已实锤导致崩溃）；但部署/补齐时必须把 `EnableHotReloadSystem` 置 `1`（自带包默认 `0`，此时 Ctrl+R 全局无反应）。
+2. **装 UE4SS**：版本必须覆盖目标引擎（老版扫不出 GUObjectArray 就换 experimental 新构建）；`EngineVersionOverride` 留空自动识别；**关闭自动热重载**（`EnableAutoReloadingLuaMods` 置 `0`，自动重载已实锤导致崩溃），只用手动 Ctrl+R；但部署/补齐时必须把 `EnableHotReloadSystem` 置 `1`（自带包默认 `0`，此时 Ctrl+R 全局无反应）。两个开关别混。
 3. **确认启动**：Steam 是否必须运行、启动后注入是否成功（示例：`dwmapi.dll` 代理）、`ue4ss/UE4SS.log` 有无报错。
 4. **确认输入**：游戏内控制台开启方式（示例：`~`/F10）、Ctrl+R 重载、热键位；输出双通道（控制台回显 + `UE4SS.log`）。
 5. **全对象导出**：拿 `UE4SS_ObjectDump.txt`，之后一切逆向都从搜它开始。
@@ -38,7 +38,7 @@
 
 ### 1.1 双通道就绪检查（UE 必须 UE4SS+内存两条都通）
 
-- Lua 通道：脚本部署后游戏内 Ctrl+R，看到 `loaded` 回显（控制台 + `UE4SS.log` 各一行）；hook 类以日志成功行为准（如免费开关的两行 ids），重载/重启后重开。**本局启动时 Mod 未注册则本局注定无通道，Ctrl+R 救不回，必须重启游戏**（见 1.2 顺序铁律）。
+- Lua 通道：脚本部署后游戏内 Ctrl+R，看到 `loaded` 回显（控制台 + `UE4SS.log` 各一行）；hook 类以日志成功行为准（山门案例：免费开关的两行 ids），重载/重启后重开。**本局启动时 Mod 未注册则本局注定无通道，Ctrl+R 救不回，必须重启游戏**（见 1.2 顺序铁律）。
 - 内存通道：CE 桥脚本放 `autorun` 自启（或确认管道能 ping 通）；直连游戏进程确认 PID；抽查已有 AOB 是否仍唯一（1 分钟，版本漂移第一发现人）。
 - 开关归属：同一批字节，UI 和 CE 表**二选一**操作，反向互顶必出灵异问题。
 
@@ -46,9 +46,9 @@
 - 双注册（experimental 3.x 真认的是 `Mods/mods.json`，`mods.txt` 只是 load order）：两边都要有 `<Name>`，缺一边即静默跳过——日志表现为到 `Keybinds` 就 `Event loop start`，无报错、无 `loaded`、无 `Error loading`。`mods.txt` 必须干净无空行无注释行；每次解包/更新 UE4SS 后重验两边。
 - 改完脚本部署后游戏内 **Ctrl+R 一次**，看到 `loaded` 回显才算数；按之前先关游戏内控制台、游戏窗口聚焦，否则按键被输入框吃掉。
 - **顺序铁律：先开修改器（补本体 + 双注册 + Scripts），再开游戏。** 启动瞬间注册表就必须就位；新用户/Steam 更新后首次必须走这个顺序。
-- 修改器启动自动体检三件套（缺一不可，进 `engine/deploy.py` 复用：UE 用 `ue_auto_setup`，Unity 用 `ensure_bepinex_present`；目录定位走 `tools/steam_find.py`）：①校验注入本体（代理 dll + `ue4ss/` 目录，缺即用自带包补，自带包打进 exe，只补缺项）②双注册修复 + `EnableHotReloadSystem=1` ③发通道探针（如下发 `lv_help` 等 `exec done`，超时判死）。补完本体必须提示**重启一次游戏**，不要在本局继续测。
+- 修改器启动自动体检三件套（缺一不可，进 `engine/deploy.py` 复用：UE 用 `ue_auto_setup`，Unity 用 `ensure_bepinex_present`；目录定位走 `tools/steam_find.py`）：①校验注入本体（代理 dll + `ue4ss/` 目录，缺即用自带包补，自带包打进 exe，只补缺项）②双注册修复 + `EnableHotReloadSystem=1` ③发通道探针（山门案例：下发 `lv_help` 等 `exec done`，超时判死）。补完本体必须提示**重启一次游戏**，不要在本局继续测。
 - **hook 是纯内存的**：重载/重启即失效，用前重开（如免费开关），以日志回显为准，不要凭记忆。
-- 外部 UI 下发命令走桥接文件：写 `.tmp` 再整体替换成 `cmd.txt`（防读半截），游戏内 `LoopAsync` 轮询执行，结果只回 `UE4SS.log`（`[LVT]` 前缀），执行后文件清空。
+- 外部 UI 下发命令走桥接文件：写 `.tmp` 再整体替换成 `cmd.txt`（防读半截），游戏内 `LoopAsync` 轮询执行，结果只回 `UE4SS.log`（山门案例 tag `[LVT]`），执行后文件清空。
 - `启动修改器UI.bat` 必须纯 ASCII（中文路径/命令会碎）。
 
 ### 1.3 工程目录约定（一游戏一文件夹）
@@ -73,17 +73,17 @@
 
 ### 2.1 多口径陷阱（必查，易错）
 
-同一数值常有多种读法并存（示例：UI 显示的 int 口径 vs 内存 Map 存的 float 口径）。门后判断走哪条，以实测为准；验证时注明口径；补丁要能覆盖实际走的那条，不要默认只改一条。
+同一数值常有多种读法并存（山门案例：UI 显示的 int 口径 vs 内存 Map 存的 float 口径）。门后判断走哪条，以实测为准；验证时注明口径；补丁要能覆盖实际走的那条，不要默认只改一条。
 
 ### 2.2 按类目寻找参照（已验证行；新类目按六问现填，不要预设流程相同）
 
 | 类目 | 首要侦察对象 | 官方参照 |
 |---|---|---|
 | 物品/货币 | 背包组件、资源 Map、发奖链 | 官方发奖/拾取/商店购买 |
-| 属性/弟子 | actor + 内嵌 struct + 加成字段；战斗面板重算规则 | 修炼/突破/授职官方入口 |
+| 属性/弟子 | actor + 内嵌 struct + 加成字段；战斗面板重算规则 | 修炼/突破/授职官方入口（山门案例） |
 | 商店 | 商品数组、购买函数（先只读商品再小额试买） | 商店购买 |
-| 科技 | 状态枚举、队列/加速函数；直设点亮可能是空心的 | 研究材料+手动研究 |
-| 拍卖 | 组件计时字段、Skip/Exit 语义（先只读计时，再动） | NPC 上拍周期 |
+| 科技 | 状态枚举、队列/加速函数；直设点亮可能是空心的 | 研究材料+手动研究（山门案例） |
+| 拍卖 | 组件计时字段、Skip/Exit 语义（先只读计时，再动） | NPC 上拍周期（山门案例） |
 | 建筑 | 等级字段、升级零参入口（先读等级再试升） | 升级/建造 |
 
 ### 2.3 跨类目必查
@@ -101,8 +101,8 @@
 - 调函数 `obj:Func(args)`，读 `obj.Prop`，写 `obj.Prop = v`；找对象 `FindFirstOf`/`StaticFindObject`/`UEHelpers`。
 - hook 改返回值：`RegisterHook(全路径, function(self, ...) return <值> end)`，注销要干净；先拿无风险函数做 A/B 验证（hook 时变、注销恢复），再挂真目标。
 - hook 拦不住 `void`（如实际扣除）和 native 内部直读——这些归 CE。
-- 外部命令桥（推荐脚手架，非 UE4SS 自带）：游戏内 `LoopAsync` 轮询 `cmd.txt`，外部写 `.tmp` 再整体替换；结果回日志 `[LVT]` 前缀；命令注册 `reg(name, fn)` + 控制台 `lv_` 双入口共用实现。
-- 批量发奖/刷屏类操作先小批量试，再全量；功法秘籍类常有单品上限，小批量验证。
+- 外部命令桥（推荐脚手架，非 UE4SS 自带）：游戏内 `LoopAsync` 轮询 `cmd.txt`，外部写 `.tmp` 再整体替换；结果回日志 `[LVT]` 前缀（山门案例 tag）；命令注册 `reg(name, fn)` + 控制台双入口共用实现（山门案例前缀 `lv_`）。
+- 批量发奖/刷屏类操作先小批量试，再全量（山门案例：功法秘籍类常有单品上限）。
 - 验证用**秒级对照**（写后立刻读），分钟级对照会被生产 tick 污染出假阳性。
 
 **Hook 返回值语义（检查函数放行的唯一正确口径）：** 回调 `return` 非 nil 即覆盖原返回值，`return nil`/无 return 则保留原值；`/Script/` 开头路径支持 pre（第2参）+post（第3参），BP 路径只用第2参；delegate 不支持，被 hook 函数须已在内存；返回的 PreId/PostId 双 ID 注销。不要把“return true 放行”当通用模板——先确认目标函数返回值语义。
@@ -153,7 +153,7 @@
 
 1. 顶部：游戏根目录 + 一键部署 + 游戏/Mod/进程三行状态自检。目录自动定位：注册表 Steam 路径 → `libraryfolders.vdf` 枚举各库 → `appmanifest_<id>.acf` 读安装目录 → 校验 exe 存在（exe 嵌在子目录时向下找）；找不到转手动选择 + ini 记忆。
 2. 一键部署只补缺项：注入本体缺啥补啥，已有不碰，不动存档和别人的插件；自家文件缺失或版本不一致（大小/哈希比对）才覆盖。部署前查进程（`tasklist` 对 exe 名），运行中禁止覆盖并提示完全退出。部署完提示重启一次游戏。（模板实现：`engine/deploy.py` + `tools/steam_find.py`，见 `ui/app.py` 接线。）
-3. Tab 按系统分（物品/常用包/弟子/建筑/拍卖…），数值页遵循读基线→输期望→算差值→写→重读。
+3. Tab 按系统分（山门案例页：物品/常用包/弟子/建筑/拍卖…），数值页遵循读基线→输期望→算差值→写→重读。
 4. 危险操作（全量发放、删特性、升级建筑）先确认框；不可逆标注清楚。
 5. 日志框只收 `[LVT]` 提纯行 + 内存层 `OK/失败` 行；超时明确写“去游戏内/日志确认”，不谎报成功。
 6. 新功能只增按钮和方法，不改无关页；中文名缺口（FText 无表）先标“待拆包”，不硬编。
@@ -164,9 +164,9 @@
 
 ### 5.1 最小验证清单
 
-- [ ] Ctrl+R 后有 `loaded` 回显；hook 类以日志两行成功为准
+- [ ] Ctrl+R 后有 `loaded` 回显；hook 类以日志成功行为为准（山门案例为两行）
 - [ ] 读数与游戏内面板一致（注明 int/float 口径）
-- [ ] 写后立刻重读；UI 以“确认框能执行”为准，残留的红色缺货显示可能是旧账单渲染，不等于失败（见 5.2 旧账单行）
+- [ ] 写后立刻重读；UI 以“确认框能执行”为准，残留的红色缺货显示可能是旧账单渲染（山门案例），不等于失败（见 5.2 旧账单行）
 - [ ] 存档+读档正常（坏数据会在存档序列化时崩）
 - [ ] 开关关闭后字节/行为恢复；只走一边开关
 - [ ] 重复操作不叠加；场景切换后仍有效
@@ -177,7 +177,7 @@
 |---|---|---|
 | 改了没效果 | 没 Ctrl+R；hook 本局没开；补丁字节不在内存 | 查 `loaded` 回显、hook 日志行、直读补丁位字节 |
 | 升级/购买仍报缺 | UI 用的是面板打开时算好的旧账单；或执行侧扣除变负 | 先确认 Lua hook 开着；检查+扣除成对 patch；看确认框按钮状态不要只看红字 |
-| 调了 native 函数后 UI 卡死 | 踹到状态机奇怪分支（如拍卖 Skip） | 列禁用名单；重读档恢复，卡住时不存档 |
+| 调了 native 函数后 UI 卡死 | 踹到状态机奇怪分支（山门案例：拍卖 Skip） | 列禁用名单；重读档恢复，卡住时不存档 |
 | struct 一碰就崩 | 装备/资源 struct 双向转换不支持 | 只读 struct；走官方标量入口；装备走存档流程 |
 | 秒级有效、几分钟后“失效” | 生产 tick 污染对照 | 缩短对照窗口；以 Map 读回为准 |
 | 全局 AOB 勾选卡 10 秒 | `aobscan` 全内存扫 | 一律 `aobscanmodule` 限定主模块 |
@@ -186,13 +186,13 @@
 | 游戏更新后全挂 | 基址/AOB/签名漂移 | 按第 1 节重走侦察，先验 AOB 唯一性 |
 | 补丁开后重进/读档/切场景失效 | hook 纯内存 + 场景限定对象 | 重开 hook（以日志为准）；场景对象改 NotifyOnNewObject 监听 |
 | CE 里搜到、成品搜不到 | 特征码含补丁位/模块名写错 | 特征码只取补丁前前缀；`module` 与 game.yaml 一致（UE 主模块/Unity GameAssembly.dll） |
-| 敏感操作后崩溃有时无 dump | 非受控退出（如 Text 传参挂起线程） | 该类入口直接禁用，走存档流程 |
+| 敏感操作后崩溃有时无 dump | 非受控退出（山门案例：Text 传参挂起线程） | 该类入口直接禁用，走存档流程 |
 
 ### 5.3 回滚
 
 - Mod 回滚：`mods.txt` 置 0 + Ctrl+R；UE4SS 整包保留旧版备份。
 - 内存补丁回滚 = restore 原字节；CT 回滚 = 取消勾选（会写回原字节，注意别和 UI 互顶）。
-- 存档类操作前先备份存档；拿不重要的对象先测（如废档弟子）。
+- 存档类操作前先备份存档；拿不重要的对象先测（山门案例：废档弟子）。
 
 ---
 
